@@ -15,7 +15,6 @@ import           System.Directory              as D
 
 trace' x = trace (show x) x
 
--- someFunc :: IO ()
 someFunc rootFile = do
     foundFiles <- S.toList <$> getSubgraph rootFile
     P.mapM_ P.putStrLn foundFiles

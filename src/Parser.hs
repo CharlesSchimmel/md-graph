@@ -40,14 +40,14 @@ wikiLinkWithTitle = do
     closingDoubleBrackets
     return $ Link (T.pack linkContent) (T.pack linkTitle)
 
-wikiLink = try wikiLinkWithTitle <|> try simpleWikiLink
-
 parseLinks :: Text -> Maybe [Link]
 parseLinks = parseMaybe (catMaybes <$> many document)
 
 linkTest = parseTest (catMaybes <$> many document)
 
-document = (Just <$> try wikiLink) <|> (anyChar $> Nothing)
+document = (Just <$> try links) <|> (anyChar $> Nothing)
+
+links = try wikiLinkWithTitle <|> try simpleWikiLink <|> try markdownLink
 
 openingDoubleBrackets :: Parser (Tokens Text)
 openingDoubleBrackets = string "[["
@@ -56,3 +56,16 @@ closingDoubleBrackets = string "]]"
 
 anyChar :: Parser Char
 anyChar = satisfy $ const True
+
+markdownLink :: Parser Link
+markdownLink = do
+    M.char '['
+    titleContent <- many
+        $ satisfy (\t -> t /= ']' && t /= '(' && t /= ')' && t /= '[')
+    M.char ']'
+    M.char '('
+    linkContent <- many
+        $ satisfy (\t -> t /= ']' && t /= '(' && t /= ')' && t /= '[')
+    M.char ')'
+    return $ Link (T.pack linkContent) (T.pack titleContent)
+
