@@ -1,4 +1,4 @@
-# zkw-subgraph
+# markdown-subgraph
 
 I have a directory of notes in [Obsidian](https://obsidian.md/) format 
 (Commonmark but with WikiLinks-style links instead of Markdown). Those notes 

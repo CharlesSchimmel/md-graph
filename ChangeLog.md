@@ -1,3 +1,3 @@
-# Changelog for zkw-subgraph
+# Changelog for markdown-subgraph
 
 ## Unreleased changes
