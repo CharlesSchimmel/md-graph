@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3d5e4253162d63d11ef7cfbbfd4df89633af2ec701428ec2b75a6d9dffc12881
+-- hash: a54717bcb4c54c091593078af75d5c07a0b6d0e7410adf3fdb2bd95bb1e7a461
 
 name:           markdown-subgraph
 version:        0.1.0.0
@@ -33,17 +33,17 @@ library
       Link
       Parser
   other-modules:
-      Paths_zkw_subgraph
+      Paths_markdown_subgraph
   hs-source-dirs:
       src
   default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
   build-depends:
       base >=4.7 && <5
     , directory
+    , filepath
     , hashable
     , megaparsec
     , mtl
-    , system-filepath
     , text
     , transformers
     , unordered-containers
@@ -52,7 +52,7 @@ library
 executable markdown-subgraph-exe
   main-is: Main.hs
   other-modules:
-      Paths_zkw_subgraph
+      Paths_markdown_subgraph
   hs-source-dirs:
       app
   default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
@@ -60,21 +60,21 @@ executable markdown-subgraph-exe
   build-depends:
       base >=4.7 && <5
     , directory
+    , filepath
     , hashable
+    , markdown-subgraph
     , megaparsec
     , mtl
-    , system-filepath
     , text
     , transformers
     , unordered-containers
-    , markdown-subgraph
   default-language: Haskell2010
 
 test-suite markdown-subgraph-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_zkw_subgraph
+      Paths_markdown_subgraph
   hs-source-dirs:
       test
   default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
@@ -82,12 +82,12 @@ test-suite markdown-subgraph-test
   build-depends:
       base >=4.7 && <5
     , directory
+    , filepath
     , hashable
+    , markdown-subgraph
     , megaparsec
     , mtl
-    , system-filepath
     , text
     , transformers
     , unordered-containers
-    , markdown-subgraph
   default-language: Haskell2010

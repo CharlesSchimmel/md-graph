@@ -24,10 +24,10 @@ default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, Flexible
 dependencies:
 - base >= 4.7 && < 5
 - directory
+- filepath
 - hashable
 - megaparsec
 - mtl
-- system-filepath
 - text
 - transformers
 - unordered-containers

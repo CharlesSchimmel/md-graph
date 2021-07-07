@@ -2,11 +2,14 @@ module Lib
     ( someFunc
     ) where
 
+import           File
 import           Link
 import           Parser
 
 import           Control.Applicative            ( (<|>) )
+import           Control.Monad                  ( join )
 import           Data.HashSet                  as S
+import           Data.Maybe
 import           Data.Text                     as T
 import           Data.Text.IO                  as T
 import           Debug.Trace
@@ -28,10 +31,21 @@ readIntoNodes file = do
     exists <- (<|>) <$> maybeFile file <*> maybeFile (file ++ ".md")
     flip (maybe $ return []) exists $ \file' -> do
         content <- T.readFile file'
-        let parseResult = parseLinks content
-        -- at this point we'll need to "pivot" child results if they're relative
-        -- paths to the current file
-        return $ maybe [] (P.map (T.unpack . uri)) parseResult
+        let parseResult = P.map (T.unpack . uri) <$> parseLinks content
+
+        extantChildren <- P.sequence $ P.mapM (pivotChild file) <$> parseResult
+        let extant' = catMaybes <$> extantChildren
+
+        return $ fromMaybe [] extant'
+
+-- if the current file is "./foo/bar/baz.md"
+-- and the child is referenced from the current file as "../child" then
+-- we need to update the child to be "./foo/child"
+pivotChild :: FilePath -> FilePath -> IO (Maybe FilePath)
+pivotChild currentFile child = do
+    let reRelativizedChild = reRelativize currentFile child
+    (<|>) <$> maybeFile reRelativizedChild <*> maybeFile
+        (reRelativizedChild ++ ".md")
 
 getSubgraph file = recurse file S.empty
 
@@ -40,7 +54,6 @@ recurse file visitedNodes = do
     children <- readIntoNodes file
     P.foldr fold nodesAndCurrent children
   where
-    children :: IO [FilePath]
     children = readIntoNodes file
     fold :: FilePath -> IO (HashSet FilePath) -> IO (HashSet FilePath)
     fold curFile visitedFiles = do
