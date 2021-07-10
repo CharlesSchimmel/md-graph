@@ -2,7 +2,6 @@
 
 module Lib
     ( printSubgraph
-    , getSubgraph
     ) where
 
 import           File
@@ -25,58 +24,44 @@ import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
--- A links to B with title and anchor
+type Source = FilePath
+type Sink = FilePath
+type Sinks = [Sink]
+type Graph = HashMap Source Sinks
 
-data Edge = Edge
-    { source :: FilePath
-    , link   :: Link
+data Corpus = Corpus
+    { forward  :: Graph
+    , backward :: Graph
+    , allFiles :: HashSet FilePath
     }
-    deriving Show
 
 trace' x = trace (show x) x
 
 printSubgraph rootFile = do
-    foundFiles <- S.toList <$> getSubgraph rootFile
-    P.mapM_ P.putStrLn foundFiles
+    undefined
 
-readIntoNodes :: FilePath -> IO [FilePath]
-readIntoNodes file = do
-    exists <- (<|>) <$> maybeFile file <*> maybeFile (file ++ ".md")
-    flip (maybe $ return []) exists $ \file' -> do
-        content <- T.readFile file'
-        let parseResult = P.map T.unpack <$> sieveLinks content
+corpus :: [FilePath] -> IO Corpus
+corpus paths = do
+    files <- deepFiles paths
+    graph <- buildGraph files
+    return $ Corpus graph (backGraph graph) (S.fromList files)
 
-        extantChildren <- P.sequence $ P.mapM (pivotChild file) <$> parseResult
-        let extant' = catMaybes <$> extantChildren
+nodes :: [FilePath] -> IO [Node]
+nodes paths = do
+    files <- deepFiles paths
+    graph <- buildGraph files
+    return $ buildNodes graph (backGraph graph) files
 
-        return $ fromMaybe [] extant'
+subgraph :: Graph -> Source -> HashSet FilePath
+subgraph graph = recurse graph S.empty
 
--- if the current file is "./foo/bar/baz.md"
--- and the child is referenced from the current file as "../child" then
--- we need to update the child to be "./foo/child"
-pivotChild :: FilePath -> FilePath -> IO (Maybe FilePath)
-pivotChild currentFile child = do
-    let reRelativizedChild = reRelativize currentFile child
-    (<|>) <$> maybeFile reRelativizedChild <*> maybeFile
-        (reRelativizedChild ++ ".md")
-
-getSubgraph file = recurse file S.empty
-
-recurse :: FilePath -> HashSet FilePath -> IO (HashSet FilePath)
-recurse file visitedNodes = do
-    children <- readIntoNodes file
-    P.foldr fold nodesAndCurrent children
+recurse :: Graph -> HashSet FilePath -> Source -> HashSet FilePath
+recurse graph visited file = P.foldr fold (file `S.insert` visited) children
   where
-    children = readIntoNodes file
-    fold :: FilePath -> IO (HashSet FilePath) -> IO (HashSet FilePath)
-    fold curFile visitedFiles = do
-        visitedFiles_ <- visitedFiles
-        let alreadyVisited = curFile `S.member` visitedFiles_
-        if alreadyVisited
-            then visitedFiles
-            else S.union <$> visitedFiles <*> recurse curFile visitedFiles_
-
-    nodesAndCurrent = pure $ S.insert file visitedNodes
+    children = maybe S.empty S.fromList $ graph M.!? file
+    fold cur visited = if cur `S.member` visited
+        then visited
+        else visited `S.union` recurse graph visited cur
 
 parseFile :: FilePath -> IO [Text]
 parseFile file = do
@@ -84,15 +69,47 @@ parseFile file = do
     let parseResult = sieveLinks content
     return $ fromMaybe [] parseResult
 
-deepYieldLinks :: [FilePath] -> IO Graph
-deepYieldLinks files = do
-    deepFiles <- join . catMaybes <$> P.mapM traverseDir files
-    M.fromList <$> P.mapM parseIntoTuple deepFiles
+deepFiles :: [FilePath] -> IO [FilePath]
+deepFiles files = join . catMaybes <$> P.mapM traverseDir files
+
+-- should try to build forward and backward graphs at once
+buildGraph :: [FilePath] -> IO Graph
+buildGraph files = M.fromList . P.filter hasAny <$> P.mapM parseIntoTuple files
   where
-    parseIntoTuple x = (x, ) . P.map (fillExtension . T.unpack) <$> parseFile x
+    hasAny (_, xs) = not $ P.null xs
+    parseIntoTuple x =
+        (x, )
+            .   P.map (fillExtension . reRelativize x . T.unpack)
+            <$> parseFile x
 
-type Source = FilePath
-type Sinks = [FilePath]
-type Graph = HashMap Source Sinks
+backGraph :: Graph -> Graph
+backGraph g = S.toList <$> P.foldr fold M.empty flattened
+  where
+    asList    = M.toList g
+    flattened = asList >>= (\(source, sinks) -> P.map (, source) sinks)
+    fold (sink, source) map =
+        M.insertWith S.union sink (S.singleton source) map
 
+orphans :: Graph -> Graph -> HashSet FilePath -> HashSet FilePath
+orphans forGraph backGraph allFiles = allFiles `S.difference` nonOrphans
+    where nonOrphans = M.keysSet forGraph `S.union` M.keysSet backGraph
 
+stranded :: Graph -> Graph -> HashSet FilePath
+stranded forwGraph backGraph =
+    M.keysSet forwGraph `S.difference` M.keysSet backGraph
+
+data Node = Node
+    { label :: String
+    , fwd   :: [Node]
+    , bwd   :: [Node]
+    }
+
+instance Show Node where
+    show = label
+
+buildNodes :: Graph -> Graph -> [FilePath] -> [Node]
+buildNodes fwds bwds all = P.map go all
+  where
+    go label = Node label
+                    (maybe [] (P.map go) $ fwds M.!? label)
+                    (maybe [] (P.map go) $ bwds M.!? label)

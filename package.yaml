@@ -27,6 +27,7 @@ dependencies:
 - filepath
 - hashable
 - megaparsec
+- optparse-applicative
 - pandoc
 - pandoc-types
 - mtl

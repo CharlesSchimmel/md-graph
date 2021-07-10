@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9fd4bdf601318064728705be86ced7e23e8ac38d42320a771b80a382942c811f
+-- hash: a49ad257b1e3bed7e7da3a9736000f1f4ed0522ef86f3e54e0e529deb1e02682
 
 name:           markdown-subgraph
 version:        0.1.0.0
@@ -32,6 +32,7 @@ library
       Lib
       Link
       Parser
+      PParser
   other-modules:
       Paths_markdown_subgraph
   hs-source-dirs:
@@ -44,6 +45,7 @@ library
     , hashable
     , megaparsec
     , mtl
+    , optparse-applicative
     , pandoc
     , pandoc-types
     , text
@@ -67,6 +69,7 @@ executable markdown-subgraph-exe
     , markdown-subgraph
     , megaparsec
     , mtl
+    , optparse-applicative
     , pandoc
     , pandoc-types
     , text
@@ -91,6 +94,7 @@ test-suite markdown-subgraph-test
     , markdown-subgraph
     , megaparsec
     , mtl
+    , optparse-applicative
     , pandoc
     , pandoc-types
     , text
