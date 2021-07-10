@@ -23,22 +23,32 @@ wikiLinkBrackets innerParser =
         $ mfilter nonBracketContent innerParser
     where nonBracketContent x = x /= '[' && x /= ']'
 
+wikiLinkSpecialChars :: String
+wikiLinkSpecialChars = "[|]"
+
 simpleWikiLink :: Parser Link
 simpleWikiLink = do
     openingDoubleBrackets
-    innerText <- many $ satisfy (\x -> x /= '|' && x /= ']' && x /= '[')
-    let link = T.pack innerText
+    (linkContent, anchor) <- wikiLinkContent
     closingDoubleBrackets
-    return $ Link link link
+    return $ Link linkContent linkContent anchor
 
 wikiLinkWithTitle :: Parser Link
 wikiLinkWithTitle = do
     openingDoubleBrackets
-    linkContent <- many $ satisfy (\t -> t /= '|' && t /= ']' && t /= '[')
-    string "|"
-    linkTitle <- many $ satisfy (\t -> t /= ']' && t /= '[')
+    (linkContent, anchor) <- wikiLinkContent
+    M.char '|'
+    linkTitle <- many $ satisfy (`notElem` ("[]" :: String))
     closingDoubleBrackets
-    return $ Link (T.pack linkContent) (T.pack linkTitle)
+    return $ Link linkContent (T.pack linkTitle) anchor
+
+wikiLinkContent :: Parser (Text, Maybe Text)
+wikiLinkContent = do
+    linkContent <- many $ satisfy (`notElem` ("[|]#" :: String))
+    anchor      <- optional $ do
+        _ <- M.char '#'
+        many $ satisfy (`notElem` ("[|]" :: String))
+    return (T.pack linkContent, T.pack <$> anchor)
 
 parseLinks :: Text -> Maybe [Link]
 parseLinks = parseMaybe (catMaybes <$> many document)
@@ -57,6 +67,14 @@ closingDoubleBrackets = string "]]"
 anyChar :: Parser Char
 anyChar = satisfy $ const True
 
+markdownLinkContent :: Parser (Text, Maybe Text)
+markdownLinkContent = do
+    link   <- many $ satisfy (`notElem` ("[]()#" :: String))
+    anchor <- optional $ do
+        _ <- M.char '#'
+        many $ satisfy (`notElem` ("[]()" :: String))
+    return (T.pack link, T.pack <$> anchor)
+
 markdownLink :: Parser Link
 markdownLink = do
     M.char '['
@@ -64,8 +82,8 @@ markdownLink = do
         $ satisfy (\t -> t /= ']' && t /= '(' && t /= ')' && t /= '[')
     M.char ']'
     M.char '('
-    linkContent <- many
-        $ satisfy (\t -> t /= ']' && t /= '(' && t /= ')' && t /= '[')
+    (linkContent, anchor) <- markdownLinkContent
     M.char ')'
-    return $ Link (T.pack linkContent) (T.pack titleContent)
+    return $ Link linkContent (T.pack titleContent) anchor
+
 

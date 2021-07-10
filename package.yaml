@@ -27,6 +27,8 @@ dependencies:
 - filepath
 - hashable
 - megaparsec
+- pandoc
+- pandoc-types
 - mtl
 - text
 - transformers

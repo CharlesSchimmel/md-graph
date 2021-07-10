@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a54717bcb4c54c091593078af75d5c07a0b6d0e7410adf3fdb2bd95bb1e7a461
+-- hash: 9fd4bdf601318064728705be86ced7e23e8ac38d42320a771b80a382942c811f
 
 name:           markdown-subgraph
 version:        0.1.0.0
@@ -44,6 +44,8 @@ library
     , hashable
     , megaparsec
     , mtl
+    , pandoc
+    , pandoc-types
     , text
     , transformers
     , unordered-containers
@@ -65,6 +67,8 @@ executable markdown-subgraph-exe
     , markdown-subgraph
     , megaparsec
     , mtl
+    , pandoc
+    , pandoc-types
     , text
     , transformers
     , unordered-containers
@@ -87,6 +91,8 @@ test-suite markdown-subgraph-test
     , markdown-subgraph
     , megaparsec
     , mtl
+    , pandoc
+    , pandoc-types
     , text
     , transformers
     , unordered-containers
