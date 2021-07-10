@@ -26,7 +26,7 @@ import           System.FilePath               as F
 
 type Source = FilePath
 type Sink = FilePath
-type Sinks = [Sink]
+type Sinks = HashSet Sink
 type Graph = HashMap Source Sinks
 
 data Corpus = Corpus
@@ -42,15 +42,15 @@ printSubgraph rootFile = do
 
 corpus :: [FilePath] -> IO Corpus
 corpus paths = do
-    files <- deepFiles paths
-    graph <- buildGraph files
-    return $ Corpus graph (backGraph graph) (S.fromList files)
+    files              <- deepFiles paths
+    (graph, backGraph) <- buildGraphs files
+    return $ Corpus graph backGraph (S.fromList files)
 
 nodes :: [FilePath] -> IO [Node]
 nodes paths = do
-    files <- deepFiles paths
-    graph <- buildGraph files
-    return $ buildNodes graph (backGraph graph) files
+    files              <- deepFiles paths
+    (graph, backGraph) <- buildGraphs files
+    return $ buildNodes graph backGraph files
 
 subgraph :: Graph -> Source -> HashSet FilePath
 subgraph graph = recurse graph S.empty
@@ -58,7 +58,7 @@ subgraph graph = recurse graph S.empty
 recurse :: Graph -> HashSet FilePath -> Source -> HashSet FilePath
 recurse graph visited file = P.foldr fold (file `S.insert` visited) children
   where
-    children = maybe S.empty S.fromList $ graph M.!? file
+    children = fromMaybe S.empty $ graph M.!? file
     fold cur visited = if cur `S.member` visited
         then visited
         else visited `S.union` recurse graph visited cur
@@ -73,22 +73,21 @@ deepFiles :: [FilePath] -> IO [FilePath]
 deepFiles files = join . catMaybes <$> P.mapM traverseDir files
 
 -- should try to build forward and backward graphs at once
-buildGraph :: [FilePath] -> IO Graph
-buildGraph files = M.fromList . P.filter hasAny <$> P.mapM parseIntoTuple files
+buildGraphs :: [FilePath] -> IO (Graph, Graph)
+buildGraphs files = do
+    parsed <- P.mapM parseIntoTuple files
+    return $ P.foldr fold (M.empty, M.empty) parsed
   where
-    hasAny (_, xs) = not $ P.null xs
-    parseIntoTuple x =
-        (x, )
-            .   P.map (fillExtension . reRelativize x . T.unpack)
+    fold (f, b) (fs, bs) = (fs `union_squared` f, bs `union_squared` b)
+    union_squared = M.unionWith S.union
+    parseIntoTuple x = do
+        parseResult <- P.map (fillExtension . reRelativize x . T.unpack)
             <$> parseFile x
-
-backGraph :: Graph -> Graph
-backGraph g = S.toList <$> P.foldr fold M.empty flattened
-  where
-    asList    = M.toList g
-    flattened = asList >>= (\(source, sinks) -> P.map (, source) sinks)
-    fold (sink, source) map =
-        M.insertWith S.union sink (S.singleton source) map
+        let
+            forward = M.filter (not . S.null)
+                $ M.fromList [(x, S.fromList parseResult)]
+        let backward = M.fromList $ P.map (, S.singleton x) parseResult
+        return (forward, backward)
 
 orphans :: Graph -> Graph -> HashSet FilePath -> HashSet FilePath
 orphans forGraph backGraph allFiles = allFiles `S.difference` nonOrphans
@@ -111,5 +110,5 @@ buildNodes :: Graph -> Graph -> [FilePath] -> [Node]
 buildNodes fwds bwds all = P.map go all
   where
     go label = Node label
-                    (maybe [] (P.map go) $ fwds M.!? label)
-                    (maybe [] (P.map go) $ bwds M.!? label)
+                    (maybe [] (P.map go . S.toList) $ fwds M.!? label)
+                    (maybe [] (P.map go . S.toList) $ bwds M.!? label)
