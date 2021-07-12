@@ -65,8 +65,11 @@ recurse graph visited file = P.foldr fold (file `S.insert` visited) children
 parseFile :: FilePath -> IO [Text]
 parseFile file = do
     content <- T.readFile file
-    let parseResult = sieveLinks content
+    let parseResult = fmap ignoreAnchors <$> sieveLinks content
     return $ fromMaybe [] parseResult
+
+ignoreAnchors :: Text -> Text
+ignoreAnchors = T.takeWhile (/= '#')
 
 deepFiles :: [FilePath] -> IO [FilePath]
 deepFiles files = join . catMaybes <$> P.mapM traverseDir files

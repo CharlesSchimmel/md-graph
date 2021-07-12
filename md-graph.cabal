@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 39d0e61f393c7a65c0cc2c78ee91b67734bbd19ff8af90b66e6dc24ee6cbe9c4
+-- hash: 96a743f1378f85d6f4891b2527463c1f00ee50cbe99eaa587539432ddb5db43e
 
 name:           md-graph
 version:        0.1.0.0
@@ -34,7 +34,7 @@ library
       Parser
       PParser
   other-modules:
-      Paths_markdown_subgraph
+      Paths_md_graph
   hs-source-dirs:
       src
   default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
@@ -53,15 +53,15 @@ library
     , unordered-containers
   default-language: Haskell2010
 
-executable md-graph-exe
+executable md-graph
   main-is: Main.hs
   other-modules:
       Options
-      Paths_markdown_subgraph
+      Paths_md_graph
   hs-source-dirs:
       app
   default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -dynamic
   build-depends:
       base >=4.7 && <5
     , directory
@@ -82,7 +82,7 @@ test-suite md-graph-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Paths_markdown_subgraph
+      Paths_md_graph
   hs-source-dirs:
       test
   default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
