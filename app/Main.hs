@@ -1,8 +1,10 @@
 module Main where
 
+import           Lib
+import           Options
+
 import           Data.Text                     as T
 import           Data.Text.IO                  as T
-import           Lib
 import           System.Environment
 import           Text.Pandoc.Class
 import           Text.Pandoc.Definition
@@ -17,11 +19,11 @@ minimalPandoc = runIOorExplode . readMarkdown def
 
 main :: IO ()
 main = do
-  content <- T.readFile "/home/elpfen/zk/index.md"
-  ast     <- runIOorExplode . readVimwiki def $ content
-  print ast
-  let result = query extractUrl ast
-  print result
+    content <- T.readFile "/home/elpfen/zk/index.md"
+    ast     <- runIOorExplode . readVimwiki def $ content
+    print ast
+    let result = query extractUrl ast
+    print result
 
 extractUrl :: Inline -> [Text]
 extractUrl (Link  _ _ (u, _)) = [u]
