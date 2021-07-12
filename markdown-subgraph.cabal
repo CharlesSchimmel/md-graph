@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a49ad257b1e3bed7e7da3a9736000f1f4ed0522ef86f3e54e0e529deb1e02682
+-- hash: 39d0e61f393c7a65c0cc2c78ee91b67734bbd19ff8af90b66e6dc24ee6cbe9c4
 
 name:           markdown-subgraph
 version:        0.1.0.0
@@ -56,6 +56,7 @@ library
 executable markdown-subgraph-exe
   main-is: Main.hs
   other-modules:
+      Options
       Paths_markdown_subgraph
   hs-source-dirs:
       app

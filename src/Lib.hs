@@ -1,8 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module Lib
-    ( printSubgraph
-    ) where
+module Lib where
 
 import           File
 import           Link
@@ -40,13 +38,14 @@ trace' x = trace (show x) x
 printSubgraph rootFile = do
     undefined
 
-corpus :: [FilePath] -> IO Corpus
-corpus paths = do
-    files              <- deepFiles paths
-    (graph, backGraph) <- buildGraphs files
-    return $ Corpus graph backGraph (S.fromList files)
+corpus :: FilePath -> [FilePath] -> IO Corpus
+corpus validExt paths = do
+    files <- deepFiles paths
+    let applicableFiles = P.filter (F.isExtensionOf validExt) files
+    (fwdMap, bwdMap) <- buildGraphs applicableFiles
+    return $ Corpus fwdMap bwdMap (S.fromList applicableFiles)
 
-nodes :: [FilePath] -> IO [Node]
+nodes :: [FilePath] -> IO (HashMap FilePath Node)
 nodes paths = do
     files              <- deepFiles paths
     (graph, backGraph) <- buildGraphs files
@@ -72,7 +71,6 @@ parseFile file = do
 deepFiles :: [FilePath] -> IO [FilePath]
 deepFiles files = join . catMaybes <$> P.mapM traverseDir files
 
--- should try to build forward and backward graphs at once
 buildGraphs :: [FilePath] -> IO (Graph, Graph)
 buildGraphs files = do
     parsed <- P.mapM parseIntoTuple files
@@ -99,16 +97,17 @@ stranded forwGraph backGraph =
 
 data Node = Node
     { label :: String
-    , fwd   :: [Node]
-    , bwd   :: [Node]
+    , fwd   :: HashMap String Node
+    , bwd   :: HashMap String Node
     }
 
 instance Show Node where
-    show = label
+    show = show . label
 
-buildNodes :: Graph -> Graph -> [FilePath] -> [Node]
-buildNodes fwds bwds all = P.map go all
+buildNodes :: Graph -> Graph -> [FilePath] -> HashMap FilePath Node
+buildNodes fwds bwds all = M.fromList $ P.map build all
   where
-    go label = Node label
-                    (maybe [] (P.map go . S.toList) $ fwds M.!? label)
-                    (maybe [] (P.map go . S.toList) $ bwds M.!? label)
+    fromGraph g l =
+        maybe M.empty (M.fromList . P.map build . S.toList) $ g M.!? l
+    build label =
+        (label, Node label (fromGraph fwds label) (fromGraph bwds label))
