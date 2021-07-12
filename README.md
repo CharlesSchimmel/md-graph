@@ -1,4 +1,4 @@
-# markdown-subgraph
+# md-graph
 
 Starting with a root markdown file, get the files it has links to, and the files 
 those link to, etc.

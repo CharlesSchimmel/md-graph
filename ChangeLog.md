@@ -1,3 +1,3 @@
-# Changelog for markdown-subgraph
+# Changelog for md-graph
 
 ## Unreleased changes

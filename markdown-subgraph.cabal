@@ -6,11 +6,11 @@ cabal-version: 1.12
 --
 -- hash: 39d0e61f393c7a65c0cc2c78ee91b67734bbd19ff8af90b66e6dc24ee6cbe9c4
 
-name:           markdown-subgraph
+name:           md-graph
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/markdown-subgraph#readme>
-homepage:       https://github.com/githubuser/markdown-subgraph#readme
-bug-reports:    https://github.com/githubuser/markdown-subgraph/issues
+description:    Please see the README on GitHub at <https://github.com/githubuser/md-graph#readme>
+homepage:       https://github.com/githubuser/md-graph#readme
+bug-reports:    https://github.com/githubuser/md-graph/issues
 author:         Author name here
 maintainer:     example@example.com
 copyright:      2021 Author name here
@@ -23,7 +23,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/markdown-subgraph
+  location: https://github.com/githubuser/md-graph
 
 library
   exposed-modules:
@@ -53,7 +53,7 @@ library
     , unordered-containers
   default-language: Haskell2010
 
-executable markdown-subgraph-exe
+executable md-graph-exe
   main-is: Main.hs
   other-modules:
       Options
@@ -67,7 +67,7 @@ executable markdown-subgraph-exe
     , directory
     , filepath
     , hashable
-    , markdown-subgraph
+    , md-graph
     , megaparsec
     , mtl
     , optparse-applicative
@@ -78,7 +78,7 @@ executable markdown-subgraph-exe
     , unordered-containers
   default-language: Haskell2010
 
-test-suite markdown-subgraph-test
+test-suite md-graph-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
@@ -92,7 +92,7 @@ test-suite markdown-subgraph-test
     , directory
     , filepath
     , hashable
-    , markdown-subgraph
+    , md-graph
     , megaparsec
     , mtl
     , optparse-applicative

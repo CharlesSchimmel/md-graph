@@ -1,6 +1,6 @@
-name:                markdown-subgraph
+name:                md-graph
 version:             0.1.0.0
-github:              "githubuser/markdown-subgraph"
+github:              "githubuser/md-graph"
 license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/markdown-subgraph#readme>
+description:         Please see the README on GitHub at <https://github.com/githubuser/md-graph#readme>
 
 default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
 
@@ -39,7 +39,7 @@ library:
   source-dirs: src
 
 executables:
-  markdown-subgraph-exe:
+  md-graph-exe:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -47,10 +47,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - markdown-subgraph
+    - md-graph
 
 tests:
-  markdown-subgraph-test:
+  md-graph-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -58,4 +58,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - markdown-subgraph
+    - md-graph
