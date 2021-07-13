@@ -34,20 +34,20 @@ stack install
 - [x] Backlinks
 - [x] Orphans
 - [x] Unreachables
-- [.] subgraphs
+- [ ] Tags
+- [ ] subgraphs
     - [x] forward
     - [ ] backward
     - [ ] undirected
-- [ ] Tags
 - [ ] Ignore...
     - Lists
     - from another subgraph
-- Export graph of a collection to JSON
-- Find orphaned files
+- [ ] Ignore or include static files
 
 ### Supported Formats
-Because this (currently) only tries to parse out link types, any format that 
-uses markdown or wikilink style links should work.
+Because this merely parses out links, any format that uses markdown or wikilink 
+style links should work. Links that are escaped or encoded in a way that is 
+different from their filesystem name will not be traversed correctly.
 
 ## Background
 I have a directory of notes in markdown format that link to each other like a 
