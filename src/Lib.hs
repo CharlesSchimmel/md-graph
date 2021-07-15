@@ -76,13 +76,12 @@ buildGraphs files defaultExtension = do
   where
     fold (f, b) (fs, bs) = (fs `union_squared` f, bs `union_squared` b)
     union_squared = M.unionWith S.union
-    parseIntoTuple x = do
-        parsedLinks   <- P.map (reRelativize x . T.unpack) <$> parseFile x
-        resolvedLinks <- P.mapM (resolveOrFill defaultExtension) parsedLinks
-        let
-            forward = M.filter (not . S.null)
-                $ M.fromList [(x, S.fromList parsedLinks)]
-        let backward = M.fromList $ P.map (, S.singleton x) parsedLinks
+    parseIntoTuple source = do
+        parsedLinks <- P.map T.unpack <$> parseFile source
+        fixedLinks  <- P.mapM (fixLink defaultExtension source) parsedLinks
+        let forward = M.filter (not . S.null)
+                $ M.fromList [(source, S.fromList fixedLinks)]
+        let backward = M.fromList $ P.map (, S.singleton source) fixedLinks
         return (forward, backward)
 
 orphans :: Graph -> Graph -> HashSet FilePath -> HashSet FilePath

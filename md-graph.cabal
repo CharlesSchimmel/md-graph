@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 094660d31f6bc76a32a0862a8967f293c4f4dd3136b04a5c8fd358425ff6097b
+-- hash: 0cc49c5afff92167c86c846010382e5e9930f3019c0c5994e8b1076a145bd13a
 
 name:           md-graph
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      App
       File
       Graph
       Lib

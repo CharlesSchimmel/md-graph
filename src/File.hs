@@ -1,12 +1,13 @@
 module File
     ( reRelativize
+    , tryResolveRelativized
     , traverseDir
+    , fixLink
     , maybeFile
-    , fillExtension
-    , resolveOrFill
     ) where
 
 import           Control.Monad                  ( join )
+import           Control.Monad.Trans.Maybe
 import           Data.Maybe
 import           Debug.Trace
 import           Prelude                       as P
@@ -37,13 +38,43 @@ reRelativize source destination
 joinDir []    = ""
 joinDir paths = P.foldr1 (</>) paths
 
+recover :: Monad m => MaybeT m a -> MaybeT m a -> MaybeT m a
+recover mA mB = MaybeT $ do
+    aResult <- runMaybeT mA
+    maybe (runMaybeT mB) (pure . Just) aResult
+
+(=?>) = recover
+
+fixLink :: FilePath -> FilePath -> FilePath -> IO FilePath
+fixLink defaultExtension source dest =
+    fromMaybe dest
+        <$> runMaybeT result
+        $   tryExt defaultExtension dest
+        =?> tryRerel source dest
+        =?> tryRerelExt defaultExtension source dest
+
+tryExt :: FilePath -> FilePath -> MaybeT IO FilePath
+tryExt defExt dest = MaybeT $ maybePath $ dest <.> defExt
+
+tryRerel :: FilePath -> FilePath -> MaybeT IO FilePath
+tryRerel source dest = MaybeT $ maybePath $ reRelativize source dest
+
+tryRerelExt :: FilePath -> FilePath -> FilePath -> MaybeT IO FilePath
+tryRerelExt defExt source dest =
+    MaybeT $ maybePath $ reRelativize source (dest <.> defExt)
+
+maybePath :: FilePath -> IO (Maybe FilePath)
+maybePath path = do
+    exists <- D.doesPathExist path
+    return $ if exists then Just path else Nothing
+
+maybeFile :: FilePath -> IO (Maybe FilePath)
 maybeFile file = do
     exists <- D.doesFileExist file
     pure $ if exists then Just file else Nothing
 
 data PathType = File FilePath | Dir FilePath deriving Show
 
--- assuming paths are either files or dirs is probably incorrect
 getPathType :: FilePath -> IO (Maybe PathType)
 getPathType path = do
     exists <- D.doesPathExist path
@@ -63,12 +94,4 @@ expand' p@(Dir  path) = do
     contents     <- fmap (path </>) <$> D.listDirectory path
     contentTypes <- catMaybes <$> P.mapM getPathType contents
     join <$> P.mapM expand' contentTypes
-
-fillExtension path extension =
-    if hasExtension path then path else path <.> extension
-
-resolveOrFill :: FilePath -> FilePath -> IO FilePath
-resolveOrFill file defaultExtension = do
-    existsWithExt <- D.doesPathExist (file <.> defaultExtension)
-    return $ if existsWithExt then file <.> defaultExtension else file
 
