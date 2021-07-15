@@ -3,14 +3,15 @@ module File
     , traverseDir
     , maybeFile
     , fillExtension
+    , resolveOrFill
     ) where
 
-import           Control.Monad
+import           Control.Monad                  ( join )
 import           Data.Maybe
 import           Debug.Trace
 import           Prelude                       as P
 import           System.Directory              as D
-import           System.FilePath
+import           System.FilePath               as F
 
 trace' x = trace (show x) x
 
@@ -63,4 +64,11 @@ expand' p@(Dir  path) = do
     contentTypes <- catMaybes <$> P.mapM getPathType contents
     join <$> P.mapM expand' contentTypes
 
-fillExtension x = if hasExtension x then x else x <.> ".md"
+fillExtension path extension =
+    if hasExtension path then path else path <.> extension
+
+resolveOrFill :: FilePath -> FilePath -> IO FilePath
+resolveOrFill file defaultExtension = do
+    existsWithExt <- D.doesPathExist (file <.> defaultExtension)
+    return $ if existsWithExt then file <.> defaultExtension else file
+

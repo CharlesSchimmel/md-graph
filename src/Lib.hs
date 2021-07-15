@@ -33,22 +33,17 @@ data Corpus = Corpus
     , allFiles :: HashSet FilePath
     }
 
-trace' x = trace (show x) x
-
-printSubgraph rootFile = do
-    undefined
-
 corpus :: FilePath -> [FilePath] -> IO Corpus
 corpus validExt paths = do
     files <- deepFiles paths
     let applicableFiles = P.filter (F.isExtensionOf validExt) files
-    (fwdMap, bwdMap) <- buildGraphs applicableFiles
+    (fwdMap, bwdMap) <- buildGraphs applicableFiles validExt
     return $ Corpus fwdMap bwdMap (S.fromList applicableFiles)
 
-nodes :: [FilePath] -> IO (HashMap FilePath Node)
-nodes paths = do
+nodes :: FilePath -> [FilePath] -> IO (HashMap FilePath Node)
+nodes validExt paths = do
     files              <- deepFiles paths
-    (graph, backGraph) <- buildGraphs files
+    (graph, backGraph) <- buildGraphs files validExt
     return $ buildNodes graph backGraph files
 
 subgraph :: Graph -> Source -> HashSet FilePath
@@ -74,20 +69,20 @@ ignoreAnchors = T.takeWhile (/= '#')
 deepFiles :: [FilePath] -> IO [FilePath]
 deepFiles files = join . catMaybes <$> P.mapM traverseDir files
 
-buildGraphs :: [FilePath] -> IO (Graph, Graph)
-buildGraphs files = do
+buildGraphs :: [FilePath] -> FilePath -> IO (Graph, Graph)
+buildGraphs files defaultExtension = do
     parsed <- P.mapM parseIntoTuple files
     return $ P.foldr fold (M.empty, M.empty) parsed
   where
     fold (f, b) (fs, bs) = (fs `union_squared` f, bs `union_squared` b)
     union_squared = M.unionWith S.union
     parseIntoTuple x = do
-        parseResult <- P.map (fillExtension . reRelativize x . T.unpack)
-            <$> parseFile x
+        parsedLinks   <- P.map (reRelativize x . T.unpack) <$> parseFile x
+        resolvedLinks <- P.mapM (resolveOrFill defaultExtension) parsedLinks
         let
             forward = M.filter (not . S.null)
-                $ M.fromList [(x, S.fromList parseResult)]
-        let backward = M.fromList $ P.map (, S.singleton x) parseResult
+                $ M.fromList [(x, S.fromList parsedLinks)]
+        let backward = M.fromList $ P.map (, S.singleton x) parsedLinks
         return (forward, backward)
 
 orphans :: Graph -> Graph -> HashSet FilePath -> HashSet FilePath
