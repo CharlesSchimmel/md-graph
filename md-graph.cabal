@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 96a743f1378f85d6f4891b2527463c1f00ee50cbe99eaa587539432ddb5db43e
+-- hash: 094660d31f6bc76a32a0862a8967f293c4f4dd3136b04a5c8fd358425ff6097b
 
 name:           md-graph
 version:        0.1.0.0
@@ -31,7 +31,6 @@ library
       Graph
       Lib
       Link
-      Parser
       PParser
   other-modules:
       Paths_md_graph
