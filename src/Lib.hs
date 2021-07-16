@@ -39,7 +39,7 @@ data Corpus = Corpus
 
 corpus :: FilePath -> [FilePath] -> IO Corpus
 corpus validExt paths = do
-    files <- deepFiles paths
+    files <- fmap normalise <$> deepFiles paths
     let applicableFiles = P.filter (F.isExtensionOf validExt) files
     (fwdMap, bwdMap) <- buildGraphs applicableFiles validExt
     return $ Corpus fwdMap bwdMap (S.fromList applicableFiles)

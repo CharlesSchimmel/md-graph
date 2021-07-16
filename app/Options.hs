@@ -55,7 +55,7 @@ parseRunType =
     parseOrphans <|> parseUnreachable <|> parseSubgraph <|> parseBacklink
 
 parseSubgraph :: Parser RunType
-parseSubgraph = Subgraph <$> strOption
+parseSubgraph = Subgraph . normalise <$> strOption
     (long "subgraph" <> short 's' <> help "Find the subgraph of given file")
 
 parseOrphans :: Parser RunType
@@ -67,7 +67,7 @@ parseUnreachable = flag' Unreachable $ long "unreachable" <> short 'u' <> help
     "Find files that are unreachable, (have no backward links)"
 
 parseBacklink :: Parser RunType
-parseBacklink = Backlinks <$> strOption
+parseBacklink = Backlinks . normalise <$> strOption
     (long "backlink" <> short 'b' <> help "Find the backlinks for a given file")
 
 parseIncludeStatic :: Parser Bool

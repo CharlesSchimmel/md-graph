@@ -48,8 +48,8 @@ fixLink :: FilePath -> FilePath -> FilePath -> IO FilePath
 fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
   where
     result =
-        tryExt defaultExtension dest
-            =?> tryRerel source dest
+        (normalise <$> tryExt defaultExtension dest)
+            =?> (normalise <$> tryRerel source dest)
             =?> tryRerelExt defaultExtension source dest
 
 tryExt :: FilePath -> FilePath -> MaybeT IO FilePath
