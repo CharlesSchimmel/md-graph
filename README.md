@@ -8,20 +8,29 @@ and wikilinks (`[[file]]` or `[[file|title]]`).
 
 ## Usage
 ```
-Usage: md-graph (-l|--library ARG) [-d|--default-extension ARG] 
+Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG] 
                 ((-o|--orphans) | (-u|--unreachable) | (-s|--subgraph ARG) | 
-                  (-b|--backlink ARG))
+                  (-b|--backlink ARG)) [--inc-static ARG] [--inc-nonex ARG]
+  A utility for graph operations on a collection of markdown files
 ```
 
-* `-l, --library` - Required; folders or files to include in the graph. Folders 
-    will be recursively searched.
-* `-d, --default-extension` - Optional, defaults to `.md`; extension to use for 
-    links that do not specify an extension
-* Required, one of:
-  - `-o, --orphans` - find files that are not linked to or from
-  - `-u, --unreachable` - find files that are not linked to
-  - `-s, --subgraph FILE` given a file, find the subgraph of its forward links
-  - `-b, --backlink FILE` given a file, find its backlinks
+- `-l, --library` Required. The folders or files to include in the graph. 
+    Folders will be recursively searched.
+- Required, one of:
+    - `-o, --orphans` Find files that are not linked to or from
+    - `-u, --unreachable` Find files that are not linked to
+    - `-s, --subgraph FILE` Given a file, find the subgraph of its forward links 
+        (and its forward links' forward links, etc)
+    - `-b, --backlink FILE` Given a file, find its backlinks
+- Optional:
+    - `-d, --default-extension` Default `md`. Extension to use for 
+        links that do not specify an extension (like WikiLinks and VimWiki markdown 
+        links)
+    - `--inc-static=True|False` Default `True`. Includes static files in 
+        the output (files that were linked to and can be resolved)
+    - `--inc-none=True|False` Default `False`. Includes none-existant files in 
+        the output (files that were linked to but can not be resolved - includes 
+        HTTP links)
 
 ## Installing
 ```
@@ -31,18 +40,16 @@ stack install
 ```
 
 ## Features & Future Features
-- [x] Backlinks
-- [x] Orphans
-- [x] Unreachables
-- [ ] Tags
-- [ ] subgraphs
-    - [x] forward
-    - [ ] backward
-    - [ ] undirected
+- [-] Backlinks
+- [-] Orphans
+- [-] Subgraphs
+- [-] Unreachables
+- [-] Ignore or include static files
+- [-] Ignore or include non-existant files
+- [ ] Tags (Parsed as Backlinks)
 - [ ] Ignore...
     - Lists
     - from another subgraph
-- [ ] Ignore or include static files
 
 ### Supported Formats
 Because this merely parses out links, any format that uses markdown or wikilink 

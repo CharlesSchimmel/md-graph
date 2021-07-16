@@ -7,7 +7,9 @@ import           Link
 import           PParser
 
 import           Control.Applicative            ( (<|>) )
-import           Control.Monad                  ( join )
+import           Control.Monad                  ( foldM
+                                                , join
+                                                )
 import           Data.HashMap.Lazy              ( HashMap )
 import qualified Data.HashMap.Lazy             as M
 
@@ -26,6 +28,8 @@ type Source = FilePath
 type Sink = FilePath
 type Sinks = HashSet Sink
 type Graph = HashMap Source Sinks
+
+trace' x = trace (show x) x
 
 data Corpus = Corpus
     { forward  :: Graph
@@ -108,3 +112,22 @@ buildNodes fwds bwds all = M.fromList $ P.map build all
         maybe M.empty (M.fromList . P.map build . S.toList) $ g M.!? l
     build label =
         (label, Node label (fromGraph fwds label) (fromGraph bwds label))
+
+data Weirdos = Weirdos
+    { statix :: HashSet FilePath
+    , nonex  :: HashSet FilePath
+    }
+    deriving Show
+
+weirdos :: Corpus -> IO Weirdos
+weirdos corp = foldM fold (Weirdos S.empty S.empty) notInLibrary
+  where
+    linkTargets  = M.keysSet $ backward corp
+    notInLibrary = linkTargets `S.difference` allFiles corp
+    fold w@Weirdos { statix, nonex } file = do
+        xists <- D.doesPathExist file
+        return $ if xists
+            then w { statix = file `S.insert` statix }
+            else w { nonex = file `S.insert` nonex }
+
+

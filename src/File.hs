@@ -1,6 +1,5 @@
 module File
     ( reRelativize
-    , tryResolveRelativized
     , traverseDir
     , fixLink
     , maybeFile
@@ -46,12 +45,12 @@ recover mA mB = MaybeT $ do
 (=?>) = recover
 
 fixLink :: FilePath -> FilePath -> FilePath -> IO FilePath
-fixLink defaultExtension source dest =
-    fromMaybe dest
-        <$> runMaybeT result
-        $   tryExt defaultExtension dest
-        =?> tryRerel source dest
-        =?> tryRerelExt defaultExtension source dest
+fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
+  where
+    result =
+        tryExt defaultExtension dest
+            =?> tryRerel source dest
+            =?> tryRerelExt defaultExtension source dest
 
 tryExt :: FilePath -> FilePath -> MaybeT IO FilePath
 tryExt defExt dest = MaybeT $ maybePath $ dest <.> defExt
