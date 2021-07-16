@@ -28,7 +28,7 @@ Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG]
         links)
     - `--inc-static=True|False` Default `True`. Includes static files in 
         the output (files that were linked to and can be resolved)
-    - `--inc-none=True|False` Default `False`. Includes none-existant files in 
+    - `--inc-nonex=True|False` Default `False`. Includes non-existant files in 
         the output (files that were linked to but can not be resolved - includes 
         HTTP links)
 
@@ -40,12 +40,12 @@ stack install
 ```
 
 ## Features & Future Features
-- [-] Backlinks
-- [-] Orphans
-- [-] Subgraphs
-- [-] Unreachables
-- [-] Ignore or include static files
-- [-] Ignore or include non-existant files
+- [x] Backlinks
+- [x] Orphans
+- [x] Subgraphs
+- [x] Unreachables
+- [x] Ignore or include static files
+- [x] Ignore or include non-existant files
 - [ ] Tags (Parsed as Backlinks)
 - [ ] Ignore...
     - Lists
