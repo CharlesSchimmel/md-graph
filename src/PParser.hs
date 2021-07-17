@@ -1,4 +1,6 @@
-module PParser where
+module PParser
+    ( sieveLinks
+    ) where
 
 import           Control.Applicative
 import           Data.HashSet                  as S

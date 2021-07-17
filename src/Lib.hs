@@ -5,6 +5,7 @@ module Lib where
 import           File
 import           Node
 import           PParser
+import           TagDirection                  as TagDir
 
 import           Control.Applicative            ( (<|>) )
 import           Control.Monad                  ( foldM
@@ -36,11 +37,11 @@ data Corpus = Corpus
     , allFiles :: HashSet FilePath
     }
 
-corpus :: FilePath -> [FilePath] -> IO Corpus
-corpus validExt paths = do
+corpus :: FilePath -> TagDirection -> [FilePath] -> IO Corpus
+corpus validExt tagDir paths = do
     files <- fmap normalise <$> deepFiles paths
     let applicableFiles = P.filter (F.isExtensionOf validExt) files
-    (fwdMap, bwdMap) <- buildGraphs applicableFiles validExt
+    (fwdMap, bwdMap) <- buildGraphs validExt tagDir applicableFiles
     return $ Corpus fwdMap bwdMap (S.fromList applicableFiles)
 
 subgraph :: Graph -> Node -> HashSet Node
@@ -62,8 +63,10 @@ parseFile file = do
 deepFiles :: [FilePath] -> IO [FilePath]
 deepFiles files = join . catMaybes <$> P.mapM traverseDir files
 
-buildGraphs :: [FilePath] -> FilePath -> IO (Graph, Graph)
-buildGraphs files defaultExtension = do
+-- should probably flatten this so that it Just returns [(FilePath, Node)]
+-- and then build the graphs later
+buildGraphs :: FilePath -> TagDirection -> [FilePath] -> IO (Graph, Graph)
+buildGraphs defaultExtension tagDir files = do
     parsed <- P.mapM parseIntoTuple files
     return $ P.foldr fold (M.empty, M.empty) parsed
   where
@@ -71,12 +74,30 @@ buildGraphs files defaultExtension = do
     union_squared = M.unionWith S.union
     parseIntoTuple source = do
         parsedNodes <- parseFile source
-        fixedLinks  <- P.mapM (fixNode defaultExtension source) parsedNodes
-        let forward = M.filter (not . S.null)
-                $ M.fromList [(Link source, S.fromList fixedLinks)]
-        let backward =
-                M.fromList $ P.map (, S.singleton $ Link source) fixedLinks
-        return (forward, backward)
+        fixedNodes  <- P.mapM (fixNode defaultExtension source) parsedNodes
+        let sourceNode = Link source
+            tags       = P.filter isTag fixedNodes
+            links      = P.filter isLink fixedNodes
+            sinks      = S.fromList links
+            sources    = links ++ inTags tagDir tags
+            sourceTags =
+                M.fromList . P.map (, S.singleton sourceNode) $ outTags
+                    tagDir
+                    tags
+        let forward =
+                M.filter (not . S.null) $ M.fromList [(sourceNode, sinks)]
+        let backward = M.fromList $ P.map (, S.singleton sourceNode) sources
+        return (forward `M.union` sourceTags, backward)
+
+-- for Out, we need to include a forward entry of Tag -> Source
+-- for In, we need to include a backward entry of Source -> Tag
+outTags :: TagDirection -> [Node] -> [Node]
+outTags In _    = []
+outTags _  tags = tags
+
+inTags :: TagDirection -> [Node] -> [Node]
+inTags Out _    = []
+inTags _   tags = tags
 
 orphans :: Graph -> Graph -> HashSet FilePath -> HashSet Node
 orphans forGraph backGraph allFiles = fileNodes `S.difference` nonOrphans

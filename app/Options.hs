@@ -1,7 +1,12 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Options where
 
 import           Node
+import           TagDirection                  as TagDirection
 
+import           Data.Char                     as C
+                                                ( toLower )
 import           Data.Functor
 import           Data.Text                     as T
 import           Options.Applicative
@@ -14,6 +19,7 @@ data Arguments = Arguments
     , argRunType   :: RunType
     , argIncStatic :: Bool
     , argIncNonex  :: Bool
+    , argTagDir    :: TagDirection
     }
 
 data RunType =
@@ -40,10 +46,15 @@ parseArguments =
         <*> parseRunType
         <*> parseIncludeStatic
         <*> parseIncludeNonExistant
+        <*> parseTagDirection
 
 parseLibrary :: Parser [FilePath]
 parseLibrary = some $ strOption
-    (long "library" <> short 'l' <> help "Files or directories to parse")
+    (  long "library"
+    <> short 'l'
+    <> help "Files or directories to parse"
+    <> metavar "FILE|DIR"
+    )
 
 parseDefaultExt :: Parser FilePath
 parseDefaultExt = P.dropWhile (== '.') <$> strOption
@@ -52,17 +63,13 @@ parseDefaultExt = P.dropWhile (== '.') <$> strOption
     <> help "Default extension to use for files linked without extension"
     <> showDefault
     <> value "md"
+    <> metavar "EXT"
     )
 
 
 parseRunType :: Parser RunType
 parseRunType =
     parseOrphans <|> parseUnreachable <|> parseSubgraph <|> parseBacklink
-
-parseSubgraph :: Parser RunType
-parseSubgraph = Subgraph <$> option
-    nodeReader
-    (long "subgraph" <> short 's' <> help "Find the subgraph of given file")
 
 parseOrphans :: Parser RunType
 parseOrphans = flag' Orphans $ long "orphans" <> short 'o' <> help
@@ -72,22 +79,64 @@ parseUnreachable :: Parser RunType
 parseUnreachable = flag' Unreachable $ long "unreachable" <> short 'u' <> help
     "Find files that are unreachable, (have no backward links)"
 
+parseSubgraph :: Parser RunType
+parseSubgraph = Subgraph <$> option
+    nodeReader
+    (  long "subgraph"
+    <> short 's'
+    <> help "Find the subgraph of given file"
+    <> metavar "NODE"
+    )
+
 parseBacklink :: Parser RunType
 parseBacklink = Backlinks <$> option
     nodeReader
-    (long "backlink" <> short 'b' <> help "Find the backlinks for a given file")
+    (  long "backlinks"
+    <> short 'b'
+    <> help "Find the backlinks for a given file"
+    <> metavar "NODE"
+    )
 
 parseIncludeStatic :: Parser Bool
 parseIncludeStatic =
-    option auto $ long "inc-static" <> value True <> showDefault <> help
-        "Include static files in output"
+    option auto
+        $  long "inc-static"
+        <> value True
+        <> showDefault
+        <> help "Include static files in output"
+        <> metavar "True|False"
 
 parseIncludeNonExistant :: Parser Bool
 parseIncludeNonExistant =
-    option auto $ long "inc-nonex" <> value False <> showDefault <> help
-        "Include non-existant files in output"
+    option auto
+        $  long "inc-nonex"
+        <> value False
+        <> showDefault
+        <> help "Include non-existant files in output"
+        <> metavar "True|False"
 
 nodeReader :: ReadM Node
-nodeReader = str <&> \s -> case s of
+nodeReader = str <&> \case
     ('#' : tagText) -> Tag $ T.pack tagText
     file            -> Link $ normalise file
+
+asLower :: (String -> b) -> String -> b
+asLower fn = fn . P.map C.toLower
+
+parseTagDirection :: Parser TagDirection
+parseTagDirection =
+    option readTagDirection
+        $  long "tag-direction"
+        <> help "Change the direction of tags"
+        <> value TagDirection.In
+        <> showDefault
+        <> metavar "In|Out|Both"
+
+
+readTagDirection :: ReadM TagDirection
+readTagDirection = eitherReader . asLower $ \case
+    "in"   -> Right TagDirection.In
+    "out"  -> Right TagDirection.Out
+    "both" -> Right TagDirection.Both
+    x      -> Left ("Could not parse" ++ x)
+

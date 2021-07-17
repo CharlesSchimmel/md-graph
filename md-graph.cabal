@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ac22b9162d1ec4617c62f9f6c4aacf06a4622d91c34dc5f20c244ecf0e6aec0d
+-- hash: 92b7f028cf226b1289b70440493142fbed38cd4b1f08b25e66203b05fd65d2e5
 
 name:           md-graph
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       Lib
       Node
       PParser
+      TagDirection
   other-modules:
       Paths_md_graph
   hs-source-dirs:

@@ -16,7 +16,7 @@ import           System.Environment
 main :: IO ()
 main = do
     args    <- execParser opts
-    corpus' <- corpus (argDefExt args) (argLibrary args)
+    corpus' <- corpus (argDefExt args) (argTagDir args) (argLibrary args)
     let runResult =
             catMaybesS . S.map nodePath $ doRun corpus' (argRunType args)
     w@Weirdos { statix, nonex } <- weirdos corpus'
