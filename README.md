@@ -34,10 +34,12 @@ Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG]
 
 ### Nodes: Files & Tags
 Arguments that take a "`NODE`" (such as `--subgraph` and `--backlink`) can be 
-given either a file or a tag. Tags are given by including the hash, like so: 
-`md-graph -l "my-files" --subgraph #my-special-tag`. Tag arguments will attempt 
-to be matched against their [parsed format](#tag-format) and so must follow that 
-format as well.
+given either a file or a tag. Tags are given by including the hash just like 
+their [file-parsed counterparts](#tag-format). The following will attempt to 
+find the backlinks of the tag "my-special-tag":
+`md-graph -l "my-files" --backlink #my-special-tag`. 
+
+Everything else will be parsed as a file.
 
 ## Installing
 ```
