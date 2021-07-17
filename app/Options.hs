@@ -138,5 +138,5 @@ readTagDirection = eitherReader . asLower $ \case
     "in"   -> Right TagDirection.In
     "out"  -> Right TagDirection.Out
     "both" -> Right TagDirection.Both
-    x      -> Left ("Could not parse" ++ x)
+    x      -> Left ("Could not parse tag direction: " ++ x)
 
