@@ -56,7 +56,7 @@ stack install
 - [x] Ignore or include static files
 - [x] Ignore or include non-existant files
 - [ ] Tags
-    - [-] As forward-linked
+    - [x] As forward-linked
     - [ ] As backward-linked
     - [ ] As both/either
 - [ ] Ignore...
