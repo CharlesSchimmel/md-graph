@@ -19,9 +19,9 @@ Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG]
 - Required, one of:
     - `-o, --orphans` Find files that are not linked to or from
     - `-u, --unreachable` Find files that are not linked to
-    - `-s, --subgraph NODE` Given a [node](#nodes-files-tags), find the subgraph of its
+    - `-s, --subgraph NODE` Given a [node](#nodes-files--tags), find the subgraph of its
         forward links (and its forward links' forward links, etc)
-    - `-b, --backlink NODE` Given a [node](#nodes-files-tags), find its backlinks
+    - `-b, --backlink NODE` Given a [node](#nodes-files--tags), find its backlinks
 - Optional:
     - `-d, --default-extension` Default `md`. Extension to use for 
         links that do not specify an extension (like WikiLinks and VimWiki markdown 
