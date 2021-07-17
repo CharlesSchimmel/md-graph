@@ -19,9 +19,9 @@ Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG]
 - Required, one of:
     - `-o, --orphans` Find files that are not linked to or from
     - `-u, --unreachable` Find files that are not linked to
-    - `-s, --subgraph FILE` Given a file, find the subgraph of its forward links 
-        (and its forward links' forward links, etc)
-    - `-b, --backlink FILE` Given a file, find its backlinks
+    - `-s, --subgraph NODE` Given a [node](#nodes-files-tags), find the subgraph of its
+        forward links (and its forward links' forward links, etc)
+    - `-b, --backlink NODE` Given a [node](#nodes-files-tags), find its backlinks
 - Optional:
     - `-d, --default-extension` Default `md`. Extension to use for 
         links that do not specify an extension (like WikiLinks and VimWiki markdown 
@@ -31,6 +31,13 @@ Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG]
     - `--inc-nonex=True|False` Default `False`. Includes non-existant files in 
         the output (files that were linked to but can not be resolved - includes 
         HTTP links)
+
+### Nodes: Files & Tags
+Arguments that take a "`NODE`" (such as `--subgraph` and `--backlink`) can be 
+given either a file or a tag. Tags are given by including the hash, like so: 
+`md-graph -l "my-files" --subgraph #my-special-tag`. Tag arguments will attempt 
+to be matched against their [parsed format](#tag-format) and so must follow that 
+format as well.
 
 ## Installing
 ```
@@ -46,15 +53,20 @@ stack install
 - [x] Unreachables
 - [x] Ignore or include static files
 - [x] Ignore or include non-existant files
-- [ ] Tags (Parsed as Backlinks)
+- [x] Tags (Parsed as Backlinks)
 - [ ] Ignore...
     - Lists
     - from another subgraph
 
 ### Supported Formats
+#### Link Formats
 Because this merely parses out links, any format that uses markdown or wikilink 
 style links should work. Links that are escaped or encoded in a way that is 
 different from their filesystem name will not be traversed correctly.
+
+#### Tag Format
+Tags that follow the form of a hash ('#') followed by alpha-nums, dash, and 
+underscores will be parsed as nodes. For example, this tag is valid: `#someSort-of_tag123`.
 
 ## Background
 I have a directory of notes in markdown format that link to each other like a 
