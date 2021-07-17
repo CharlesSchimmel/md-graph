@@ -1,6 +1,7 @@
 module Main where
 
 import           Lib
+import           Node
 import           Options
 
 import           Data.HashMap.Lazy             as M
@@ -11,17 +12,13 @@ import           Data.Text.IO                  as T
 import           Options.Applicative
 import           Prelude                       as P
 import           System.Environment
-import           Text.Pandoc.Class
-import           Text.Pandoc.Definition
-import           Text.Pandoc.Options
-import           Text.Pandoc.Readers
-import           Text.Pandoc.Walk
 
 main :: IO ()
 main = do
     args    <- execParser opts
     corpus' <- corpus (argDefExt args) (argLibrary args)
-    let runResult = doRun corpus' (argRunType args)
+    let runResult =
+            catMaybesS . S.map nodePath $ doRun corpus' (argRunType args)
     w@Weirdos { statix, nonex } <- weirdos corpus'
     let modStatic = if argIncStatic args
             then runResult
@@ -31,12 +28,12 @@ main = do
             else modStatic `S.difference` nonex
     P.mapM_ P.putStrLn modNonex
 
-doRun :: Corpus -> RunType -> HashSet FilePath
+doRun :: Corpus -> RunType -> HashSet Node
 doRun (Corpus fwdMap bwdMap allFiles) Orphans = orphans fwdMap bwdMap allFiles
 
 doRun (Corpus fwdMap bwdMap allFiles) Unreachable = stranded fwdMap bwdMap
 
-doRun (Corpus fwdMap _ _) (Subgraph file) = subgraph fwdMap file
+doRun (Corpus fwdMap _ _) (Subgraph file) = subgraph fwdMap (Link file)
 
 doRun (Corpus _ bwdMap _) (Backlinks file) =
-    fromMaybe S.empty $ bwdMap M.!? file
+    fromMaybe S.empty $ bwdMap M.!? Link file
