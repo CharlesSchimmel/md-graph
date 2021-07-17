@@ -3,9 +3,6 @@
 Graph operations on a collection of interlinked Markdown (or VimWiki, ZimWiki, 
 Zettlr, Obsidian, or Neuron) notes.
 
-Supports regular commonmark-style links (`[title](file.md)` or `[title](file)`) 
-and wikilinks (`[[file]]` or `[[file|title]]`).
-
 ## Usage
 ```
 Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG] 
