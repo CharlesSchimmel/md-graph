@@ -29,6 +29,7 @@ Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG]
     - `--inc-nonex=True|False` Default `False`. Includes non-existant files in 
         the output (files that were linked to but can not be resolved - includes 
         HTTP links)
+    - `--tag-direction=In|Out|Both` Default `In`. See [Tag Direction](#tag-direction)
 
 ### Nodes: Files & Tags
 Arguments that take a "`NODE`" (such as `--subgraph` and `--backlink`) can be 
@@ -38,6 +39,15 @@ find the backlinks of the tag "my-special-tag":
 `md-graph -l "my-files" --backlink #my-special-tag`. 
 
 Everything else will be parsed as a file.
+
+### Tag Direction
+The "Tag Direction" option controls how tags are added to the graph. If the file 
+`foo.md` references tag `#bar-baz`, here's how the options will change the 
+graph:
+
+- `In`: The file has a forward link **in** to the tag.
+- `Out`: The tag has a forward link **out** to the file.
+- `Both`: The tag and the file **both** have links to each other.
 
 ## Installation
 ```
@@ -53,10 +63,10 @@ stack install
 - [x] Unreachables
 - [x] Ignore or include static files
 - [x] Ignore or include non-existant files
-- [ ] Tags
+- [x] Tags
     - [x] As forward-linked
-    - [ ] As backward-linked
-    - [ ] As both/either
+    - [x] As backward-linked
+    - [x] As both/either
 - [ ] Ignore...
     - Lists
     - from another subgraph
