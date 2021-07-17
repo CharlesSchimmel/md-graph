@@ -17,8 +17,8 @@ Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG]
 - `-l, --library` Required. The folders or files to include in the graph. 
     Folders will be recursively searched.
 - Required, one of:
-    - `-o, --orphans` Find files that are not linked to or from
-    - `-u, --unreachable` Find files that are not linked to
+    - `-u, --unreachable` Find all file in the library that are not linked to
+    - `-o, --orphans` Find all files in the library that are not linked to or from
     - `-s, --subgraph FILE` Given a file, find the subgraph of its forward links 
         (and its forward links' forward links, etc)
     - `-b, --backlink FILE` Given a file, find its backlinks
