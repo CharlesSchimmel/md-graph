@@ -29,7 +29,7 @@ Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG]
         the output (files that were linked to but can not be resolved - includes 
         HTTP links)
 
-## Installing
+## Installation
 ```
 git clone https://github.com/CharlesSchimmel/md-graph
 cd md-graph
