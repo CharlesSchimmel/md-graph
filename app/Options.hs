@@ -1,6 +1,11 @@
 module Options where
 
+import           Node
+
+import           Data.Functor
+import           Data.Text                     as T
 import           Options.Applicative
+import           Prelude                       as P
 import           System.FilePath
 
 data Arguments = Arguments
@@ -16,8 +21,8 @@ data RunType =
       | Unreachable
       | Nonexes
       | Statics
-      | Subgraph { fileToSubgraph :: FilePath }
-      | Backlinks { fileToBacklink :: FilePath }
+      | Subgraph { fileToSubgraph :: Node }
+      | Backlinks { fileToBacklink :: Node }
       deriving Show
 
 opts =
@@ -41,7 +46,7 @@ parseLibrary = some $ strOption
     (long "library" <> short 'l' <> help "Files or directories to parse")
 
 parseDefaultExt :: Parser FilePath
-parseDefaultExt = dropWhile (== '.') <$> strOption
+parseDefaultExt = P.dropWhile (== '.') <$> strOption
     (  long "default-ext"
     <> short 'd'
     <> help "Default extension to use for files linked without extension"
@@ -55,7 +60,8 @@ parseRunType =
     parseOrphans <|> parseUnreachable <|> parseSubgraph <|> parseBacklink
 
 parseSubgraph :: Parser RunType
-parseSubgraph = Subgraph . normalise <$> strOption
+parseSubgraph = Subgraph <$> option
+    nodeReader
     (long "subgraph" <> short 's' <> help "Find the subgraph of given file")
 
 parseOrphans :: Parser RunType
@@ -67,7 +73,8 @@ parseUnreachable = flag' Unreachable $ long "unreachable" <> short 'u' <> help
     "Find files that are unreachable, (have no backward links)"
 
 parseBacklink :: Parser RunType
-parseBacklink = Backlinks . normalise <$> strOption
+parseBacklink = Backlinks <$> option
+    nodeReader
     (long "backlink" <> short 'b' <> help "Find the backlinks for a given file")
 
 parseIncludeStatic :: Parser Bool
@@ -79,3 +86,8 @@ parseIncludeNonExistant :: Parser Bool
 parseIncludeNonExistant =
     option auto $ long "inc-nonex" <> value False <> showDefault <> help
         "Include non-existant files in output"
+
+nodeReader :: ReadM Node
+nodeReader = str <&> \s -> case s of
+    ('#' : tagText) -> Tag $ T.pack tagText
+    file            -> Link $ normalise file

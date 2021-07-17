@@ -3,7 +3,7 @@
 module Lib where
 
 import           File
-import           Link
+import           Node
 import           PParser
 
 import           Control.Applicative            ( (<|>) )
@@ -15,6 +15,7 @@ import qualified Data.HashMap.Lazy             as M
 
 import           Data.HashSet                   ( HashSet )
 import qualified Data.HashSet                  as S
+import           Data.Hashable
 
 import           Data.Maybe
 import           Data.Text                     as T
@@ -24,10 +25,8 @@ import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
-type Source = FilePath
-type Sink = FilePath
-type Sinks = HashSet Sink
-type Graph = HashMap Source Sinks
+type Sinks = HashSet Node
+type Graph = HashMap Node Sinks
 
 trace' x = trace (show x) x
 
@@ -44,16 +43,10 @@ corpus validExt paths = do
     (fwdMap, bwdMap) <- buildGraphs applicableFiles validExt
     return $ Corpus fwdMap bwdMap (S.fromList applicableFiles)
 
-nodes :: FilePath -> [FilePath] -> IO (HashMap FilePath Node)
-nodes validExt paths = do
-    files              <- deepFiles paths
-    (graph, backGraph) <- buildGraphs files validExt
-    return $ buildNodes graph backGraph files
-
-subgraph :: Graph -> Source -> HashSet FilePath
+subgraph :: Graph -> Node -> HashSet Node
 subgraph graph = recurse graph S.empty
 
-recurse :: Graph -> HashSet FilePath -> Source -> HashSet FilePath
+recurse :: Graph -> HashSet Node -> Node -> HashSet Node
 recurse graph visited file = P.foldr fold (file `S.insert` visited) children
   where
     children = fromMaybe S.empty $ graph M.!? file
@@ -61,14 +54,10 @@ recurse graph visited file = P.foldr fold (file `S.insert` visited) children
         then visited
         else visited `S.union` recurse graph visited cur
 
-parseFile :: FilePath -> IO [Text]
+parseFile :: FilePath -> IO [Node]
 parseFile file = do
-    content <- T.readFile file
-    let parseResult = fmap ignoreAnchors <$> sieveLinks content
-    return $ fromMaybe [] parseResult
-
-ignoreAnchors :: Text -> Text
-ignoreAnchors = T.takeWhile (/= '#')
+    content <- sieveLinks <$> T.readFile file
+    return $ fromMaybe [] content
 
 deepFiles :: [FilePath] -> IO [FilePath]
 deepFiles files = join . catMaybes <$> P.mapM traverseDir files
@@ -81,37 +70,23 @@ buildGraphs files defaultExtension = do
     fold (f, b) (fs, bs) = (fs `union_squared` f, bs `union_squared` b)
     union_squared = M.unionWith S.union
     parseIntoTuple source = do
-        parsedLinks <- P.map T.unpack <$> parseFile source
-        fixedLinks  <- P.mapM (fixLink defaultExtension source) parsedLinks
+        parsedNodes <- parseFile source
+        fixedLinks  <- P.mapM (fixNode defaultExtension source) parsedNodes
         let forward = M.filter (not . S.null)
-                $ M.fromList [(source, S.fromList fixedLinks)]
-        let backward = M.fromList $ P.map (, S.singleton source) fixedLinks
+                $ M.fromList [(Link source, S.fromList fixedLinks)]
+        let backward =
+                M.fromList $ P.map (, S.singleton $ Link source) fixedLinks
         return (forward, backward)
 
-orphans :: Graph -> Graph -> HashSet FilePath -> HashSet FilePath
-orphans forGraph backGraph allFiles = allFiles `S.difference` nonOrphans
-    where nonOrphans = M.keysSet forGraph `S.union` M.keysSet backGraph
+orphans :: Graph -> Graph -> HashSet FilePath -> HashSet Node
+orphans forGraph backGraph allFiles = fileNodes `S.difference` nonOrphans
+  where
+    nonOrphans = M.keysSet forGraph `S.union` M.keysSet backGraph
+    fileNodes  = S.map Link allFiles
 
-stranded :: Graph -> Graph -> HashSet FilePath
+stranded :: Graph -> Graph -> HashSet Node
 stranded forwGraph backGraph =
     M.keysSet forwGraph `S.difference` M.keysSet backGraph
-
-data Node = Node
-    { label :: String
-    , fwd   :: HashMap String Node
-    , bwd   :: HashMap String Node
-    }
-
-instance Show Node where
-    show = show . label
-
-buildNodes :: Graph -> Graph -> [FilePath] -> HashMap FilePath Node
-buildNodes fwds bwds all = M.fromList $ P.map build all
-  where
-    fromGraph g l =
-        maybe M.empty (M.fromList . P.map build . S.toList) $ g M.!? l
-    build label =
-        (label, Node label (fromGraph fwds label) (fromGraph bwds label))
 
 data Weirdos = Weirdos
     { statix :: HashSet FilePath
@@ -122,7 +97,7 @@ data Weirdos = Weirdos
 weirdos :: Corpus -> IO Weirdos
 weirdos corp = foldM fold (Weirdos S.empty S.empty) notInLibrary
   where
-    linkTargets  = M.keysSet $ backward corp
+    linkTargets  = catMaybesS . S.map nodePath . M.keysSet $ backward corp
     notInLibrary = linkTargets `S.difference` allFiles corp
     fold w@Weirdos { statix, nonex } file = do
         xists <- D.doesPathExist file
@@ -130,4 +105,12 @@ weirdos corp = foldM fold (Weirdos S.empty S.empty) notInLibrary
             then w { statix = file `S.insert` statix }
             else w { nonex = file `S.insert` nonex }
 
+catMaybesS :: (Eq a, Hashable a) => HashSet (Maybe a) -> HashSet a
+catMaybesS = S.foldr fold S.empty
+  where
+    fold (Just a) acc = a `S.insert` acc
+    fold Nothing  acc = acc
 
+fixNode :: FilePath -> FilePath -> Node -> IO Node
+fixNode defExt source (  Link path) = Link <$> fixLink defExt source path
+fixNode _      _      t@(Tag  _   ) = pure t

@@ -26,7 +26,6 @@ dependencies:
 - directory
 - filepath
 - hashable
-- megaparsec
 - optparse-applicative
 - pandoc
 - pandoc-types
@@ -47,7 +46,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     - -O2
-    - -dynamic
+    # - -dynamic
     dependencies:
     - md-graph
 
