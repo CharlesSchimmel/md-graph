@@ -1,8 +1,14 @@
 {-# LANGUAGE TupleSections #-}
 
-module Lib where
+module Lib
+    ( corpus
+    , Weirdos(..)
+    , weirdos
+    ) where
 
 import           File
+import           Graph
+import           HashSet
 import           Node
 import           PParser
 import           TagDirection                  as TagDir
@@ -13,29 +19,20 @@ import           Control.Monad                  ( foldM
                                                 )
 import           Data.HashMap.Lazy              ( HashMap )
 import qualified Data.HashMap.Lazy             as M
-
 import           Data.HashSet                   ( HashSet )
 import qualified Data.HashSet                  as S
 import           Data.Hashable
-
+import           Data.List                     as L
 import           Data.Maybe
 import           Data.Text                     as T
 import           Data.Text.IO                  as T
+import           Data.Tuple
 import           Debug.Trace
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
-type Sinks = HashSet Node
-type Graph = HashMap Node Sinks
-
 trace' x = trace (show x) x
-
-data Corpus = Corpus
-    { forward  :: Graph
-    , backward :: Graph
-    , allFiles :: HashSet FilePath
-    }
 
 corpus :: FilePath -> TagDirection -> [FilePath] -> IO Corpus
 corpus validExt tagDir paths = do
@@ -44,70 +41,31 @@ corpus validExt tagDir paths = do
     (fwdMap, bwdMap) <- buildGraphs validExt tagDir applicableFiles
     return $ Corpus fwdMap bwdMap (S.fromList applicableFiles)
 
-subgraph :: Graph -> Node -> HashSet Node
-subgraph graph = recurse graph S.empty
-
-recurse :: Graph -> HashSet Node -> Node -> HashSet Node
-recurse graph visited file = P.foldr fold (file `S.insert` visited) children
-  where
-    children = fromMaybe S.empty $ graph M.!? file
-    fold cur visited = if cur `S.member` visited
-        then visited
-        else visited `S.union` recurse graph visited cur
-
 parseFile :: FilePath -> IO [Node]
 parseFile file = do
     content <- sieveLinks <$> T.readFile file
     return $ fromMaybe [] content
 
-deepFiles :: [FilePath] -> IO [FilePath]
-deepFiles files = join . catMaybes <$> P.mapM traverseDir files
-
 -- should probably flatten this so that it Just returns [(FilePath, Node)]
 -- and then build the graphs later
 buildGraphs :: FilePath -> TagDirection -> [FilePath] -> IO (Graph, Graph)
 buildGraphs defaultExtension tagDir files = do
-    parsed <- P.mapM parseIntoTuple files
-    return $ P.foldr fold (M.empty, M.empty) parsed
+    nodePairs <- parseNodes defaultExtension files
+    return $ buildMaps tagDir nodePairs
+
+parseNodes :: FilePath -> [FilePath] -> IO [(Node, Node)]
+parseNodes defExt files = parseToTuples files >>= P.mapM fixNodes
   where
-    fold (f, b) (fs, bs) = (fs `union_squared` f, bs `union_squared` b)
-    union_squared = M.unionWith S.union
-    parseIntoTuple source = do
-        parsedNodes <- parseFile source
-        fixedNodes  <- P.mapM (fixNode defaultExtension source) parsedNodes
-        let sourceNode = Link source
-            tags       = P.filter isTag fixedNodes
-            links      = P.filter isLink fixedNodes
-            sinks      = S.fromList links
-            sources    = links ++ inTags tagDir tags
-            sourceTags =
-                M.fromList . P.map (, S.singleton sourceNode) $ outTags
-                    tagDir
-                    tags
-        let forward =
-                M.filter (not . S.null) $ M.fromList [(sourceNode, sinks)]
-        let backward = M.fromList $ P.map (, S.singleton sourceNode) sources
-        return (forward `M.union` sourceTags, backward)
+    fixNodes (source, node) = do
+        fixed <- fixNode defExt source node
+        return (Link source, fixed)
 
--- for Out, we need to include a forward entry of Tag -> Source
--- for In, we need to include a backward entry of Source -> Tag
-outTags :: TagDirection -> [Node] -> [Node]
-outTags In _    = []
-outTags _  tags = tags
-
-inTags :: TagDirection -> [Node] -> [Node]
-inTags Out _    = []
-inTags _   tags = tags
-
-orphans :: Graph -> Graph -> HashSet FilePath -> HashSet Node
-orphans forGraph backGraph allFiles = fileNodes `S.difference` nonOrphans
+parseToTuples :: [FilePath] -> IO [(FilePath, Node)]
+parseToTuples f = P.concat <$> P.mapM parseToTuple f
   where
-    nonOrphans = M.keysSet forGraph `S.union` M.keysSet backGraph
-    fileNodes  = S.map Link allFiles
-
-stranded :: Graph -> Graph -> HashSet Node
-stranded forwGraph backGraph =
-    M.keysSet forwGraph `S.difference` M.keysSet backGraph
+    parseToTuple f = do
+        parsedNodes <- parseFile f
+        return $ P.map (f, ) parsedNodes
 
 data Weirdos = Weirdos
     { statix :: HashSet FilePath
@@ -116,21 +74,17 @@ data Weirdos = Weirdos
     deriving Show
 
 weirdos :: Corpus -> IO Weirdos
-weirdos corp = foldM fold (Weirdos S.empty S.empty) notInLibrary
+weirdos (Corpus _ backward allFiles) = foldM fold
+                                             (Weirdos S.empty S.empty)
+                                             notInLibrary
   where
-    linkTargets  = catMaybesS . S.map nodePath . M.keysSet $ backward corp
-    notInLibrary = linkTargets `S.difference` allFiles corp
+    linkTargets  = catMaybesS . S.map nodePath . M.keysSet $ backward
+    notInLibrary = linkTargets `S.difference` allFiles
     fold w@Weirdos { statix, nonex } file = do
         xists <- D.doesPathExist file
         return $ if xists
             then w { statix = file `S.insert` statix }
             else w { nonex = file `S.insert` nonex }
-
-catMaybesS :: (Eq a, Hashable a) => HashSet (Maybe a) -> HashSet a
-catMaybesS = S.foldr fold S.empty
-  where
-    fold (Just a) acc = a `S.insert` acc
-    fold Nothing  acc = acc
 
 fixNode :: FilePath -> FilePath -> Node -> IO Node
 fixNode defExt source (  Link path) = Link <$> fixLink defExt source path

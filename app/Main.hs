@@ -1,5 +1,7 @@
 module Main where
 
+import           Graph
+import           HashSet
 import           Lib
 import           Node
 import           Options
@@ -37,3 +39,4 @@ doRun (Corpus fwdMap _ _) (Subgraph node) = subgraph fwdMap node
 
 doRun (Corpus _ bwdMap _) (Backlinks node) =
     fromMaybe S.empty $ bwdMap M.!? node
+

@@ -3,8 +3,10 @@ module File
     , traverseDir
     , fixLink
     , maybeFile
+    , deepFiles
     ) where
 
+import           Control.Applicative
 import           Control.Monad                  ( join )
 import           Control.Monad.Trans.Maybe
 import           Data.Maybe
@@ -37,20 +39,13 @@ reRelativize source destination
 joinDir []    = ""
 joinDir paths = P.foldr1 (</>) paths
 
-recover :: Monad m => MaybeT m a -> MaybeT m a -> MaybeT m a
-recover mA mB = MaybeT $ do
-    aResult <- runMaybeT mA
-    maybe (runMaybeT mB) (pure . Just) aResult
-
-(=?>) = recover
-
 fixLink :: FilePath -> FilePath -> FilePath -> IO FilePath
 fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
   where
     result =
         (normalise <$> tryExt defaultExtension dest)
-            =?> (normalise <$> tryRerel source dest)
-            =?> tryRerelExt defaultExtension source dest
+            <|> (normalise <$> tryRerel source dest)
+            <|> tryRerelExt defaultExtension source dest
 
 tryExt :: FilePath -> FilePath -> MaybeT IO FilePath
 tryExt defExt dest = MaybeT $ maybePath $ dest <.> defExt
@@ -93,4 +88,7 @@ expand' p@(Dir  path) = do
     contents     <- fmap (path </>) <$> D.listDirectory path
     contentTypes <- catMaybes <$> P.mapM getPathType contents
     join <$> P.mapM expand' contentTypes
+
+deepFiles :: [FilePath] -> IO [FilePath]
+deepFiles files = join . catMaybes <$> P.mapM traverseDir files
 

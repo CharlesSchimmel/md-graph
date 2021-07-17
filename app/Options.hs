@@ -1,9 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Options where
+module Options
+    ( Arguments(..)
+    , RunType(..)
+    , opts
+    ) where
 
 import           Node
-import           TagDirection                  as TagDirection
+import           TagDirection
 
 import           Data.Char                     as C
                                                 ( toLower )
@@ -31,6 +35,7 @@ data RunType =
       | Backlinks { fileToBacklink :: Node }
       deriving Show
 
+opts :: ParserInfo Arguments
 opts =
     info parseArguments
         $  fullDesc
@@ -81,19 +86,19 @@ parseUnreachable = flag' Unreachable $ long "unreachable" <> short 'u' <> help
 
 parseSubgraph :: Parser RunType
 parseSubgraph = Subgraph <$> option
-    nodeReader
+    readNode
     (  long "subgraph"
     <> short 's'
-    <> help "Find the subgraph of given file"
+    <> help "Find the subgraph of a given node"
     <> metavar "NODE"
     )
 
 parseBacklink :: Parser RunType
 parseBacklink = Backlinks <$> option
-    nodeReader
+    readNode
     (  long "backlinks"
     <> short 'b'
-    <> help "Find the backlinks for a given file"
+    <> help "Find the backlinks for a given node"
     <> metavar "NODE"
     )
 
@@ -115,8 +120,8 @@ parseIncludeNonExistant =
         <> help "Include non-existant files in output"
         <> metavar "True|False"
 
-nodeReader :: ReadM Node
-nodeReader = str <&> \case
+readNode :: ReadM Node
+readNode = str <&> \case
     ('#' : tagText) -> Tag $ T.pack tagText
     file            -> Link $ normalise file
 
@@ -132,11 +137,10 @@ parseTagDirection =
         <> showDefault
         <> metavar "In|Out|Both"
 
-
 readTagDirection :: ReadM TagDirection
-readTagDirection = eitherReader . asLower $ \case
-    "in"   -> Right TagDirection.In
-    "out"  -> Right TagDirection.Out
-    "both" -> Right TagDirection.Both
-    x      -> Left ("Could not parse tag direction: " ++ x)
+readTagDirection = maybeReader . asLower $ \case
+    "in"   -> Just TagDirection.In
+    "out"  -> Just TagDirection.Out
+    "both" -> Just TagDirection.Both
+    _      -> Nothing
 
