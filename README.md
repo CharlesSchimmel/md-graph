@@ -5,9 +5,11 @@ Zettlr, Obsidian, or Neuron) notes.
 
 ## Usage
 ```
-Usage: md-graph (-l|--library ARG) [-d|--default-ext ARG] 
-                ((-o|--orphans) | (-u|--unreachable) | (-s|--subgraph ARG) | 
-                  (-b|--backlink ARG)) [--inc-static ARG] [--inc-nonex ARG]
+Usage: md-graph (-l|--library FILE|DIR) [-d|--default-ext EXT] 
+                ((-o|--orphans) | (-u|--unreachable) | (-s|--subgraph NODE) | 
+                  (-b|--backlinks NODE)) [--inc-static True|False] 
+                [--inc-nonex True|False] [--tag-direction In|Out|Both]
+
   A utility for graph operations on a collection of markdown files
 ```
 
@@ -61,11 +63,12 @@ stack install
 - [x] Unreachables
 - [x] Ignore or include static files
 - [x] Ignore or include non-existant files
-- [x] Tags
+- [ ] Tags
     - [x] As forward-linked
     - [x] As backward-linked
     - [x] As both/either
-    - [ ] Include in output
+    - [ ] Include tags in output
+    - [ ] Print just tags
 - [ ] Ignore
     - from a list
     - from another subgraph
