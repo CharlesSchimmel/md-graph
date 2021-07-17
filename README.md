@@ -55,8 +55,8 @@ stack install
 - [x] Unreachables
 - [x] Ignore or include static files
 - [x] Ignore or include non-existant files
-- [.] Tags
-    - [ ] As forward-linked
+- [ ] Tags
+    - [-] As forward-linked
     - [ ] As backward-linked
     - [ ] As both/either
 - [ ] Ignore...
