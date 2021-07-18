@@ -28,13 +28,13 @@ Usage: md-graph (-l|--library FILE|DIR) [-d|--default-ext EXT]
         links)
     - `--inc-static=True|False` Default `True`. Includes static files in 
         the output (files that were linked to and can be resolved)
-    - `--inc-nonex=True|False` Default `False`. Includes non-existant files in 
+    - `--inc-nonex=True|False` Default `False`. Includes non-existent files in 
         the output (files that were linked to but can not be resolved - includes 
         HTTP links)
     - `--tag-direction=In|Out|Both` Default `In`. Controls how tags are added to 
-        the graph.
-        - `In`: The file has a link **in** to the tag
-        - `Out`: The tag has a link **out** to the file
+        the graph from the perspective of the tag.
+        - `In`: The link is coming **in** to the tag from the file
+        - `Out`: The link is from the tag **out** to the file
         - `Both`: The tag and the file **both** have links to each other.
 
 
@@ -50,6 +50,8 @@ With option `--tag-direction=Out`, you can find the subgraph of a tag.
 Everything else will be parsed as a file.
 
 ## Installation
+[Follow the instructions here to install stack](https://docs.haskellstack.org/en/stable/install_and_upgrade/)
+
 ```
 git clone https://github.com/CharlesSchimmel/md-graph
 cd md-graph
@@ -62,13 +64,13 @@ stack install
 - [x] Subgraphs
 - [x] Unreachables
 - [x] Ignore or include static files
-- [x] Ignore or include non-existant files
+- [x] Ignore or include non-existent files
+- [ ] Configurable Depths
 - [ ] Tags
     - [x] As forward-linked
     - [x] As backward-linked
     - [x] As both/either
     - [ ] Include tags in output
-    - [ ] Print just tags
 - [ ] Ignore
     - from a list
     - from another subgraph

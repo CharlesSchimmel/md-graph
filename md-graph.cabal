@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 92b7f028cf226b1289b70440493142fbed38cd4b1f08b25e66203b05fd65d2e5
+-- hash: d48c70fb78ebc582639c769a45e8849278e10c69700037740c1c8c4f9a80654f
 
 name:           md-graph
 version:        0.1.0.0
@@ -31,6 +31,7 @@ library
       File
       Graph
       GraphZipper
+      HashSet
       Lib
       Node
       PParser

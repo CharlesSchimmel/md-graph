@@ -1,5 +1,6 @@
 module Graph where
 
+import           HashSet
 import           Node
 import           TagDirection
 
@@ -31,6 +32,11 @@ data Corpus = Corpus
     , allFiles :: HashSet FilePath
     }
 
+tags :: Corpus -> HashSet Text
+tags (Corpus fwd bwd _) =
+    catMaybesS . S.map tagText $ flattenMap fwd `S.union` flattenMap bwd
+  where
+    flattenMap m = P.foldr S.union S.empty $ uncurry S.insert <$> M.toList m
 
 subgraph :: Graph -> Node -> HashSet Node
 subgraph graph = recurse graph S.empty
@@ -65,4 +71,3 @@ buildMaps tagDir fwdEdges = (fwdGraph, bwdGraph)
 
 toSnd :: (b -> c) -> (a, b) -> (a, c)
 toSnd fn (a, b) = (a, fn b)
-

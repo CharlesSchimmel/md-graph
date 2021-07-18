@@ -50,7 +50,7 @@ parseArguments =
         <*> parseDefaultExt
         <*> parseRunType
         <*> parseIncludeStatic
-        <*> parseIncludeNonExistant
+        <*> parseIncludeNonExistent
         <*> parseTagDirection
 
 parseLibrary :: Parser [FilePath]
@@ -111,13 +111,13 @@ parseIncludeStatic =
         <> help "Include static files in output"
         <> metavar "True|False"
 
-parseIncludeNonExistant :: Parser Bool
-parseIncludeNonExistant =
+parseIncludeNonExistent :: Parser Bool
+parseIncludeNonExistent =
     option auto
         $  long "inc-nonex"
         <> value False
         <> showDefault
-        <> help "Include non-existant files in output"
+        <> help "Include non-existent files in output"
         <> metavar "True|False"
 
 readNode :: ReadM Node
