@@ -39,25 +39,25 @@ tags (Corpus fwd bwd _) =
     flattenMap m = P.foldr S.union S.empty $ uncurry S.insert <$> M.toList m
 
 subgraph :: Graph -> Node -> HashSet Node
-subgraph graph = recurse graph S.empty
+subgraph graph = dfs graph S.empty
 
-recurse :: Graph -> HashSet Node -> Node -> HashSet Node
-recurse graph visited file = P.foldr fold (file `S.insert` visited) children
+dfs :: Graph -> HashSet Node -> Node -> HashSet Node
+dfs graph visited file = P.foldr fold (file `S.insert` visited) children
   where
     children = fromMaybe S.empty $ graph M.!? file
     fold cur visited = if cur `S.member` visited
         then visited
-        else visited `S.union` recurse graph visited cur
+        else visited `S.union` dfs graph visited cur
 
 orphans :: Graph -> Graph -> HashSet FilePath -> HashSet Node
-orphans forGraph backGraph allFiles = fileNodes `S.difference` nonOrphans
+orphans fwdGraph bwdGraph allFiles = fileNodes `S.difference` nonOrphans
   where
-    nonOrphans = M.keysSet forGraph `S.union` M.keysSet backGraph
+    nonOrphans = M.keysSet fwdGraph `S.union` M.keysSet bwdGraph
     fileNodes  = S.map Link allFiles
 
 stranded :: Graph -> Graph -> HashSet Node
-stranded forwGraph backGraph =
-    M.keysSet forwGraph `S.difference` M.keysSet backGraph
+stranded fwdGraph bwdGraph =
+    M.keysSet fwdGraph `S.difference` M.keysSet bwdGraph
 
 buildMaps :: TagDirection -> [(Node, Node)] -> (Graph, Graph)
 buildMaps tagDir fwdEdges = (fwdGraph, bwdGraph)

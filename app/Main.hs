@@ -32,11 +32,8 @@ main = do
 
 doRun :: Corpus -> RunType -> HashSet Node
 doRun (Corpus fwdMap bwdMap allFiles) Orphans = orphans fwdMap bwdMap allFiles
-
 doRun (Corpus fwdMap bwdMap allFiles) Unreachable = stranded fwdMap bwdMap
-
 doRun (Corpus fwdMap _ _) (Subgraph node) = subgraph fwdMap node
-
 doRun (Corpus _ bwdMap _) (Backlinks node) =
     fromMaybe S.empty $ bwdMap M.!? node
 

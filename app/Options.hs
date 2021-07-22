@@ -6,6 +6,7 @@ module Options
     , opts
     ) where
 
+import           File
 import           Node
 import           TagDirection
 
@@ -15,7 +16,8 @@ import           Data.Functor
 import           Data.Text                     as T
 import           Options.Applicative
 import           Prelude                       as P
-import           System.FilePath
+import           System.Directory              as D
+import           System.FilePath               as F
 
 data Arguments = Arguments
     { argLibrary   :: [FilePath]
