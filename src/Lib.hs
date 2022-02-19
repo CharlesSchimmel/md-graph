@@ -26,6 +26,7 @@ import           Data.List                     as L
 import           Data.Maybe
 import           Data.Text                     as T
 import           Data.Text.IO                  as T
+import           Data.Traversable              as T
 import           Data.Tuple
 import           Debug.Trace
 import           Prelude                       as P
@@ -54,18 +55,18 @@ buildGraphs defaultExtension tagDir files = do
     return $ buildMaps tagDir nodePairs
 
 parseNodes :: FilePath -> [FilePath] -> IO [(Node, Node)]
-parseNodes defExt files = parseToTuples files >>= P.mapM fixNodes
+parseNodes defExt files = parseToTuples files >>= T.mapM fixNodes
   where
     fixNodes (source, node) = do
         fixed <- fixNode defExt source node
         return (Link source, fixed)
 
 parseToTuples :: [FilePath] -> IO [(FilePath, Node)]
-parseToTuples f = P.concat <$> P.mapM parseToTuple f
+parseToTuples f = P.concat <$> T.mapM parseToTuple f
   where
     parseToTuple f = do
         parsedNodes <- parseFile f
-        return $ P.map (f, ) parsedNodes
+        return $ fmap (f, ) parsedNodes
 
 data Weirdos = Weirdos
     { statix :: HashSet FilePath

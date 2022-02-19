@@ -128,7 +128,7 @@ readNode = str <&> \case
     file            -> Link $ normalise file
 
 asLower :: (String -> b) -> String -> b
-asLower fn = fn . P.map C.toLower
+asLower fn = fn . fmap C.toLower
 
 parseTagDirection :: Parser TagDirection
 parseTagDirection =

@@ -62,12 +62,12 @@ stranded fwdGraph bwdGraph =
 buildMaps :: TagDirection -> [(Node, Node)] -> (Graph, Graph)
 buildMaps tagDir fwdEdges = (fwdGraph, bwdGraph)
   where
-    bwdGraph          = mapFromPairs $ P.map swap fwdLinks
+    bwdGraph          = mapFromPairs $ fmap swap fwdLinks
     fwdGraph          = mapFromPairs $ links ++ tagsWithDirection
     fwdLinks          = links ++ tagsWithDirection
     tagsWithDirection = tags >>= tagSwap tagDir
     (tags, links)     = L.partition (isTag . snd) fwdEdges
-    mapFromPairs      = M.fromListWith S.union . P.map (toSnd S.singleton)
+    mapFromPairs      = M.fromListWith S.union . fmap (toSnd S.singleton)
 
 toSnd :: (b -> c) -> (a, b) -> (a, c)
 toSnd fn (a, b) = (a, fn b)

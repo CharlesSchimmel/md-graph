@@ -10,6 +10,7 @@ import           Control.Applicative
 import           Control.Monad                  ( join )
 import           Control.Monad.Trans.Maybe
 import           Data.Maybe
+import           Data.Traversable              as T
 import           Debug.Trace
 import           Prelude                       as P
 import           System.Directory              as D
@@ -80,15 +81,15 @@ getPathType path = do
 traverseDir :: FilePath -> IO (Maybe [FilePath])
 traverseDir path = do
     pathType <- getPathType path
-    P.sequence $ expand' <$> pathType
+    T.sequence $ expand' <$> pathType
 
 expand' :: PathType -> IO [FilePath]
 expand' (  File path) = return [path]
 expand' p@(Dir  path) = do
     contents     <- fmap (path </>) <$> D.listDirectory path
-    contentTypes <- catMaybes <$> P.mapM getPathType contents
-    join <$> P.mapM expand' contentTypes
+    contentTypes <- catMaybes <$> T.mapM getPathType contents
+    join <$> T.mapM expand' contentTypes
 
 deepFiles :: [FilePath] -> IO [FilePath]
-deepFiles files = join . catMaybes <$> P.mapM traverseDir files
+deepFiles files = join . catMaybes <$> T.mapM traverseDir files
 

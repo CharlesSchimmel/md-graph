@@ -6,6 +6,7 @@ import           Lib
 import           Node
 import           Options
 
+import           Data.Foldable                 as F
 import           Data.HashMap.Lazy             as M
 import           Data.HashSet                  as S
 import           Data.Maybe
@@ -28,7 +29,7 @@ main = do
         modNonex = if argIncNonex args
             then modStatic
             else modStatic `S.difference` nonex
-    P.mapM_ P.putStrLn modNonex
+    F.mapM_ P.putStrLn modNonex
 
 doRun :: Corpus -> RunType -> HashSet Node
 doRun (Corpus fwdMap bwdMap allFiles) Orphans = orphans fwdMap bwdMap allFiles

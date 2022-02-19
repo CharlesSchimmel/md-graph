@@ -1,7 +1,9 @@
 # md-graph
 
-Graph operations on a collection of interlinked Markdown (or VimWiki, ZimWiki, 
-Zettlr, Obsidian, or Neuron) notes.
+Graph operations on a collection of interlinked Markdown (or 
+[VimWiki](https://github.com/vimwiki/vimwiki), [ZimWiki](https://zim-wiki.org/), 
+[Zettlr](https://www.zettlr.com/), [Obsidian](https://obsidian.md/), or 
+[Neuron](https://obsidian.md/)) notes.
 
 ## Usage
 ```
@@ -71,6 +73,9 @@ stack install
     - [x] As backward-linked
     - [x] As both/either
     - [ ] Include tags in output
+- [ ] Populate and query against a database
+    - Populate on query
+    - Watch with inotify
 - [ ] Ignore
     - from a list
     - from another subgraph
