@@ -1,10 +1,10 @@
 module Main where
 
+import           Arguments
 import           Graph
 import           HashSet
 import           Lib
 import           Node
-import           Options
 
 import           Data.Foldable                 as F
 import           Data.HashMap.Lazy             as M

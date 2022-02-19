@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Options
+module Arguments
     ( Arguments(..)
     , RunType(..)
     , opts
@@ -28,6 +28,8 @@ data Arguments = Arguments
     , argTagDir    :: TagDirection
     }
 
+-- rename to "Command"?
+-- The other options (Nonex, Static, TagDir) could probably be part of this type, too
 data RunType =
     Orphans
       | Unreachable
@@ -61,6 +63,8 @@ parseLibrary = some $ strOption
     <> short 'l'
     <> help "Files or directories to parse"
     <> metavar "FILE|DIR"
+    <> value "./"
+    <> showDefault
     )
 
 parseDefaultExt :: Parser FilePath
