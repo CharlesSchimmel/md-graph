@@ -50,6 +50,7 @@ Available options:
   --depth ARG              How deep traversal should go (default: -1)
   -h,--help                Show this help text
 ```
+- `NODES` The target files or tags to act as the start of the subgraph.
 - `--inc-static=True|False` Default `True`. Includes static files in 
     the output (files that were linked to and can be resolved)
 - `--inc-nonex=True|False` Default `False`. Includes non-existent files in 
@@ -60,6 +61,8 @@ Available options:
     - `In`: The link is coming **in** to the tag from the file
     - `Out`: The link is from the tag **out** to the file
     - `Both`: The tag and the file **both** have links to each other.
+- `--depth INT` Default `-1` (infinite depth). Configures how many links deep 
+    from the target NODES a subgraph should traverse.
 
 ### Backlinks
 ```
@@ -71,9 +74,9 @@ Available options:
   --depth ARG              How deep traversal should go (default: 1)
   -h,--help                Show this help text
 ```
-
-- Optional:
-
+- `NODES` The target files or tags to act as the start of the subgraph.
+- `--depth INT` Default `1` (immediate links only). Configures how many links 
+    deep from the target NODES a subgraph should traverse.
 
 ### Nodes: Files & Tags
 Arguments that take a "`NODE`" (such as `subgraph` and `backlinks`) can be given 
