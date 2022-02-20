@@ -36,9 +36,8 @@ Available commands:
 
 ### Subgraph
 ```
-Usage: md-graph subgraph NODES [--inc-nonex True|False] [--inc-static 
-True|False] [--tag-direction In|Out|Both]
-                         [--depth ARG]
+Usage: md-graph subgraph NODES [--inc-nonex True|False] [--inc-static True|False]
+                               [--tag-direction In|Out|Both] [--depth ARG]
   The subgraph of a node
 
 Available options:
