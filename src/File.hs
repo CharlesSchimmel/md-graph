@@ -9,14 +9,12 @@ module File
 import           Control.Applicative
 import           Control.Monad                  ( join )
 import           Control.Monad.Trans.Maybe
+import           Data.Foldable
 import           Data.Maybe
 import           Data.Traversable              as T
-import           Debug.Trace
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
-
-trace' x = trace (show x) x
 
 doubleDot :: FilePath
 doubleDot = ".."
@@ -90,6 +88,6 @@ expand' p@(Dir  path) = do
     contentTypes <- catMaybes <$> T.mapM getPathType contents
     join <$> T.mapM expand' contentTypes
 
-deepFiles :: [FilePath] -> IO [FilePath]
-deepFiles files = join . catMaybes <$> T.mapM traverseDir files
+deepFiles :: (Traversable f, Foldable f) => f FilePath -> IO [FilePath]
+deepFiles files = join . catMaybes . toList <$> T.mapM traverseDir files
 

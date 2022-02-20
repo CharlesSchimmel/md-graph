@@ -2,10 +2,10 @@
 
 module Arguments
     ( Arguments(..)
-    , RunType(..)
     , opts
     ) where
 
+import           Command
 import           File
 import           Node
 import           TagDirection
@@ -13,59 +13,73 @@ import           TagDirection
 import           Data.Char                     as C
                                                 ( toLower )
 import           Data.Functor
+import           Data.List.NonEmpty
+import           Data.Maybe
 import           Data.Text                     as T
 import           Options.Applicative
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
+
 data Arguments = Arguments
-    { argLibrary   :: [FilePath]
-    , argDefExt    :: FilePath
-    , argRunType   :: RunType
-    , argIncStatic :: Bool
-    , argIncNonex  :: Bool
-    , argTagDir    :: TagDirection
+    { argLibrary :: [FilePath]
+    , argDefExt  :: FilePath
+    , argCommand :: Command
     }
+    deriving Show
 
--- rename to "Command"?
--- The other options (Nonex, Static, TagDir) could probably be part of this type, too
-data RunType =
-    Orphans
-      | Unreachable
-      | Nonexes
-      | Statics
-      | Subgraph { fileToSubgraph :: Node }
-      | Backlinks { fileToBacklink :: Node }
-      deriving Show
+parseCommand :: Parser Command
+parseCommand = hsubparser
+    (  command
+          "subgraph"
+          ( info (Subgraph <$> (parseSubgraphOptions <*> parseDepth (-1)))
+          $ progDesc "The subgraph of a node"
+          )
+    <> command
+           "backlinks"
+           ( info (Backlinks <$> (parseBacklinkOptions <*> parseDepth 1))
+           $ progDesc "The backlinks (reverse subgraph) of a node"
+           )
+    <> command
+           "unreachable"
+           (info (pure Unreachable) $ progDesc "Files that are not linked to")
+    <> command "orphans"
+               (info (pure Orphans) $ progDesc "Files without any links")
+    <> command
+           "nonexistant"
+           (info (pure Nonexes) $ progDesc "Links that cannot be resolved")
+    <> command
+           "static"
+           ( info (pure Statics)
+           $ progDesc "Links that can be resolved but are not notes"
+           )
+    )
 
-opts :: ParserInfo Arguments
+opts :: IO Arguments
 opts =
-    info parseArguments
+    customExecParser (prefs disambiguate)
+        $  info (helper <*> parseArguments)
         $  fullDesc
-        <> progDesc
-               "A utility for graph operations on a collection of markdown files"
-        <> header "Markdown Graph"
+        <> header
+               "md-graph - A utility for graph operations on a collection of markdown files"
 
 parseArguments :: Parser Arguments
 parseArguments =
-    Arguments
-        <$> parseLibrary
-        <*> parseDefaultExt
-        <*> parseRunType
-        <*> parseIncludeStatic
-        <*> parseIncludeNonExistent
-        <*> parseTagDirection
+    Arguments <$> parseLibrary <*> parseDefaultExt <*> parseCommand
 
 parseLibrary :: Parser [FilePath]
-parseLibrary = some $ strOption
-    (  long "library"
-    <> short 'l'
-    <> help "Files or directories to parse"
-    <> metavar "FILE|DIR"
-    <> value "./"
-    <> showDefault
-    )
+parseLibrary =
+    fromMaybe (["./"])
+        <$> (optional $ some
+                (strOption
+                    (  long "library"
+                    <> short 'l'
+                    <> help "Files or directories to parse"
+                    <> metavar "FILE|DIR"
+                    )
+                )
+            )
 
 parseDefaultExt :: Parser FilePath
 parseDefaultExt = P.dropWhile (== '.') <$> strOption
@@ -77,36 +91,28 @@ parseDefaultExt = P.dropWhile (== '.') <$> strOption
     <> metavar "EXT"
     )
 
+-- parseSubgraphOptions :: Parser SubgraphOptions
+parseSubgraphOptions =
+    SubgraphOptions
+        <$> parseSubgraphTargets
+        <*> parseIncludeNonExistent
+        <*> parseIncludeStatic
+        <*> parseTagDirection
 
-parseRunType :: Parser RunType
-parseRunType =
-    parseOrphans <|> parseUnreachable <|> parseSubgraph <|> parseBacklink
+parseBacklinkOptions = BacklinkOptions <$> parseSubgraphTargets
 
-parseOrphans :: Parser RunType
-parseOrphans = flag' Orphans $ long "orphans" <> short 'o' <> help
-    "Find files without forward or backward links"
+parseDepth :: Integer -> Parser Integer
+parseDepth def =
+    option auto
+        $  long "depth"
+        <> help "How deep traversal should go"
+        <> showDefault
+        <> value def
 
-parseUnreachable :: Parser RunType
-parseUnreachable = flag' Unreachable $ long "unreachable" <> short 'u' <> help
-    "Find files that are unreachable, (have no backward links)"
-
-parseSubgraph :: Parser RunType
-parseSubgraph = Subgraph <$> option
+parseSubgraphTargets :: Parser [Node]
+parseSubgraphTargets = some $ argument
     readNode
-    (  long "subgraph"
-    <> short 's'
-    <> help "Find the subgraph of a given node"
-    <> metavar "NODE"
-    )
-
-parseBacklink :: Parser RunType
-parseBacklink = Backlinks <$> option
-    readNode
-    (  long "backlinks"
-    <> short 'b'
-    <> help "Find the backlinks for a given node"
-    <> metavar "NODE"
-    )
+    (metavar "NODES" <> help "Nodes (files or #tags) to process")
 
 parseIncludeStatic :: Parser Bool
 parseIncludeStatic =
