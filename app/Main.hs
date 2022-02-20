@@ -20,7 +20,7 @@ import           System.Environment
 
 main :: IO ()
 main = do
-    args    <- execParser opts
+    args    <- opts
     files   <- retrieveFiles (argDefExt args) (argLibrary args)
     links   <- parseNodes (argDefExt args) files
     results <- doRun' (argCommand args) links $ S.fromList files

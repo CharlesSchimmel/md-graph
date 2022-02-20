@@ -58,9 +58,10 @@ parseCommand = hsubparser
            )
     )
 
-opts :: ParserInfo Arguments
+opts :: IO Arguments
 opts =
-    info (helper <*> parseArguments)
+    customExecParser (prefs disambiguate)
+        $  info (helper <*> parseArguments)
         $  fullDesc
         <> header
                "md-graph - A utility for graph operations on a collection of markdown files"
