@@ -32,44 +32,38 @@ data Arguments = Arguments
 -- rename to "Command"?
 -- The other options (Nonex, Static, TagDir) could probably be part of this type, too
 parseCommand :: Parser Command
-parseCommand = subparser
+parseCommand = hsubparser
     (  command
           "subgraph"
           ( info (Subgraph <$> (parseSubgraphOptions <*> parseDepth (-1)))
-          $ progDesc "Find the subgraph of a node"
+          $ progDesc "The subgraph of a node"
           )
     <> command
            "backlinks"
-           ( info (Backlinks <$> (parseSubgraphOptions <*> parseDepth 1))
-           $ progDesc "Find the backlinks (reverse subgraph) of a node"
+           ( info (Backlinks <$> (parseBacklinkOptions <*> parseDepth 1))
+           $ progDesc "The backlinks (reverse subgraph) of a node"
            )
     <> command
            "unreachable"
-           ( info (pure Unreachable)
-           $ progDesc "Find files that are not linked to"
-           )
-    <> command
-           "orphans"
-           (info (pure Orphans) $ progDesc "Find files without any links")
+           (info (pure Unreachable) $ progDesc "Files that are not linked to")
+    <> command "orphans"
+               (info (pure Orphans) $ progDesc "Files without any links")
     <> command
            "nonexistant"
-           ( info (pure Nonexes)
-           $ progDesc "Find files that are linked to but do not exist"
-           )
+           (info (pure Nonexes) $ progDesc "Links that cannot be resolved")
     <> command
            "static"
-           (info (pure Statics) $ progDesc
-               "Find files that are linked to but are not note files"
+           ( info (pure Statics)
+           $ progDesc "Links that can be resolved but are not notes"
            )
     )
 
 opts :: ParserInfo Arguments
 opts =
-    info parseArguments
+    info (helper <*> parseArguments)
         $  fullDesc
-        <> progDesc
-               "A utility for graph operations on a collection of markdown files"
-        <> header "Markdown Graph"
+        <> header
+               "md-graph - A utility for graph operations on a collection of markdown files"
 
 parseArguments :: Parser Arguments
 parseArguments =
@@ -106,6 +100,8 @@ parseSubgraphOptions =
         <*> parseIncludeStatic
         <*> parseTagDirection
 
+parseBacklinkOptions = BacklinkOptions <$> parseSubgraphTargets
+
 parseDepth :: Integer -> Parser Integer
 parseDepth def =
     option auto
@@ -114,8 +110,8 @@ parseDepth def =
         <> showDefault
         <> value def
 
-parseSubgraphTargets :: Parser (NonEmpty Node)
-parseSubgraphTargets = some1 $ argument
+parseSubgraphTargets :: Parser [Node]
+parseSubgraphTargets = some $ argument
     readNode
     (metavar "NODES" <> help "Nodes (files or #tags) to process")
 

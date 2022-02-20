@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c097a45e62cc38fa27da024753698a7de6e5891ced1964af12dc781a4481fe48
+-- hash: eeeb7a3808af5e740b36a19913f2fc240cb901ba78bf7ed7eefc0a0e979f5d7f
 
 name:           md-graph
 version:        0.1.0.0
@@ -27,7 +27,6 @@ source-repository head
 
 library
   exposed-modules:
-      App
       File
       Graph
       GraphZipper
@@ -60,7 +59,6 @@ executable md-graph
   other-modules:
       Arguments
       Command
-      Environment
       Paths_md_graph
   hs-source-dirs:
       app

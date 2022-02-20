@@ -10,15 +10,21 @@ data Command =
       | Nonexes
       | Statics
       | Subgraph SubgraphOptions
-      | Backlinks SubgraphOptions
+      | Backlinks BacklinkOptions
       deriving Show
 
 data SubgraphOptions = SubgraphOptions
-  { sgTargets    :: NonEmpty Node
-  , sgInclNonex  :: Bool
-  , sgInclStatic :: Bool
-  , sgTagDir     :: TagDirection
-  , sgDepth      :: Integer
-  }
-  deriving Show
+    { sgTargets    :: [Node]
+    , sgInclNonex  :: Bool
+    , sgInclStatic :: Bool
+    , sgTagDir     :: TagDirection
+    , sgDepth      :: Integer
+    }
+    deriving Show
 
+
+data BacklinkOptions = BacklinkOptions
+    { blTargets :: [Node]
+    , blDepth   :: Integer
+    }
+    deriving Show

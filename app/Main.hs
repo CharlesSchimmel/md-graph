@@ -37,17 +37,24 @@ doRun' Unreachable nodes allFiles = return $ stranded fwdMap bwdMap
 doRun' Nonexes nodes allFiles = do
     let (fwdMap, bwdMap) = buildMaps nodes
     results <- weirdos $ Corpus fwdMap bwdMap allFiles
-    return . S.map Link $ nonex results
+    return $ nonex results
 
 doRun' Statics nodes allFiles = do
     let (fwdMap, bwdMap) = buildMaps nodes
     results <- weirdos $ Corpus fwdMap bwdMap allFiles
-    return . S.map Link $ statix results
+    return $ statix results
 
 doRun' (Subgraph (SubgraphOptions targets incNonex incStatic tagDir depth)) nodes allFiles
-    = return $ subgraph depth fwdGraph targets
-    where (fwdGraph, bwdGraph) = buildMaps $ adjustLinks tagDir nodes
+    = do
+        (Weirdos statix nonex) <- weirdos $ Corpus fwdGraph bwdGraph allFiles
+        return . withNonex nonex . withStatic statix $ subgraph depth
+                                                                fwdGraph
+                                                                targets
+  where
+    (fwdGraph, bwdGraph) = buildMaps $ adjustLinks tagDir nodes
+    withNonex            = if incNonex then const id else flip S.difference
+    withStatic           = if incStatic then const id else flip S.difference
 
-doRun' (Backlinks (SubgraphOptions targets incNonex incStatic tagDir depth)) nodes allFiles
-    = return $ subgraph depth bwdGraph targets
-    where (fwdGraph, bwdGraph) = buildMaps $ adjustLinks tagDir nodes
+doRun' (Backlinks (BacklinkOptions targets depth)) nodes allFiles =
+    return $ subgraph depth bwdGraph targets
+    where (fwdGraph, bwdGraph) = buildMaps nodes

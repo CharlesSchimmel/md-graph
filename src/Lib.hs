@@ -72,8 +72,8 @@ parseToTuples f = P.concat <$> T.mapM parseToTuple f
         return $ fmap (f, ) parsedNodes
 
 data Weirdos = Weirdos
-    { statix :: HashSet FilePath
-    , nonex  :: HashSet FilePath
+    { statix :: HashSet Node
+    , nonex  :: HashSet Node
     }
     deriving Show
 
@@ -87,8 +87,8 @@ weirdos (Corpus _ backward allFiles) = foldM fold
     fold w@Weirdos { statix, nonex } file = do
         xists <- D.doesPathExist file
         return $ if xists
-            then w { statix = file `S.insert` statix }
-            else w { nonex = file `S.insert` nonex }
+            then w { statix = Link file `S.insert` statix }
+            else w { nonex = Link file `S.insert` nonex }
 
 fixNode :: FilePath -> FilePath -> Node -> IO Node
 fixNode defExt source (  Link path) = Link <$> fixLink defExt source path
