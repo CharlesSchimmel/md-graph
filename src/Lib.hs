@@ -47,7 +47,8 @@ corpus validExt tagDir paths = do
 adjustLinks :: TagDirection -> [(Node, Node)] -> [(Node, Node)]
 adjustLinks tagDir links = links >>= tagSwap tagDir
 
-retrieveFiles :: FilePath -> NonEmpty FilePath -> IO [FilePath]
+retrieveFiles
+    :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [FilePath]
 retrieveFiles defaultExt paths = do
     files <- fmap normalise <$> deepFiles paths
     return $ P.filter (F.isExtensionOf defaultExt) files

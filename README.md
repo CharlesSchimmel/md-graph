@@ -9,12 +9,10 @@ Graph operations on a collection of interlinked Markdown (or
 ```
 md-graph - A utility for graph operations on a collection of markdown files
 
-Usage: md-graph [(-l|--library FILE|DIR) [-l|--library FILE|DIR]] 
-                [-d|--default-ext EXT] COMMAND
+Usage: md-graph [(-l|--library FILE|DIR)] [-d|--default-ext EXT] COMMAND
 
 Available options:
   -h,--help                Show this help text
-  -l,--library FILE|DIR    Files or directories to parse
   -l,--library FILE|DIR    Files or directories to parse
   -d,--default-ext EXT     Default extension to use for files linked without
                            extension (default: "md")

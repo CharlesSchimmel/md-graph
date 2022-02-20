@@ -23,14 +23,12 @@ import           System.FilePath               as F
 
 
 data Arguments = Arguments
-    { argLibrary :: NonEmpty FilePath
+    { argLibrary :: [FilePath]
     , argDefExt  :: FilePath
     , argCommand :: Command
     }
     deriving Show
 
--- rename to "Command"?
--- The other options (Nonex, Static, TagDir) could probably be part of this type, too
 parseCommand :: Parser Command
 parseCommand = hsubparser
     (  command
@@ -70,10 +68,10 @@ parseArguments :: Parser Arguments
 parseArguments =
     Arguments <$> parseLibrary <*> parseDefaultExt <*> parseCommand
 
-parseLibrary :: Parser (NonEmpty FilePath)
+parseLibrary :: Parser [FilePath]
 parseLibrary =
-    fromMaybe ("./" :| [])
-        <$> (optional $ some1
+    fromMaybe (["./"])
+        <$> (optional $ some
                 (strOption
                     (  long "library"
                     <> short 'l'
