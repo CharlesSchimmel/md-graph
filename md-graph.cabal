@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: eeeb7a3808af5e740b36a19913f2fc240cb901ba78bf7ed7eefc0a0e979f5d7f
+-- hash: 5bf59bce2d2d809d2cd58b43f1dbcee5c1860778428154ef93a1119fe5f52b2a
 
 name:           md-graph
 version:        0.1.0.0
@@ -29,7 +29,6 @@ library
   exposed-modules:
       File
       Graph
-      GraphZipper
       HashSet
       Lib
       Node
@@ -45,7 +44,7 @@ library
     , directory
     , filepath
     , hashable
-    , mtl
+    , network-uri
     , optparse-applicative
     , pandoc
     , pandoc-types
@@ -70,7 +69,7 @@ executable md-graph
     , filepath
     , hashable
     , md-graph
-    , mtl
+    , network-uri
     , optparse-applicative
     , pandoc
     , pandoc-types
@@ -94,7 +93,7 @@ test-suite md-graph-test
     , filepath
     , hashable
     , md-graph
-    , mtl
+    , network-uri
     , optparse-applicative
     , pandoc
     , pandoc-types

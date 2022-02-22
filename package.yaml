@@ -26,10 +26,10 @@ dependencies:
 - directory
 - filepath
 - hashable
+- network-uri
 - optparse-applicative
 - pandoc
 - pandoc-types
-- mtl
 - text
 - transformers
 - unordered-containers
