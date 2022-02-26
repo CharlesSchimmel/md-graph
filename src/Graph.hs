@@ -68,10 +68,9 @@ stranded fwdGraph bwdGraph =
 buildMaps :: [(Node, Node)] -> (Graph, Graph)
 buildMaps edges = (fwdGraph, bwdGraph)
   where
-    bwdGraph      = mapFromPairs $ fmap swap links
-    fwdGraph      = mapFromPairs links
-    (tags, links) = L.partition (isTag . snd) edges
-    mapFromPairs  = M.fromListWith S.union . fmap (toSnd S.singleton)
+    bwdGraph     = mapFromPairs $ fmap swap edges
+    fwdGraph     = mapFromPairs edges
+    mapFromPairs = M.fromListWith S.union . fmap (toSnd S.singleton)
 
 toSnd :: (b -> c) -> (a, b) -> (a, c)
 toSnd fn (a, b) = (a, fn b)

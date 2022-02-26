@@ -116,7 +116,7 @@ parseSubgraphTargets = some $ argument
 
 parseIncludeStatic :: Parser Bool
 parseIncludeStatic =
-    option auto
+    option readCaseInsensitiveBool
         $  long "inc-static"
         <> value True
         <> showDefault
@@ -125,12 +125,18 @@ parseIncludeStatic =
 
 parseIncludeNonExistent :: Parser Bool
 parseIncludeNonExistent =
-    option auto
+    option readCaseInsensitiveBool
         $  long "inc-nonex"
         <> value False
         <> showDefault
         <> help "Include non-existent files in output"
         <> metavar "True|False"
+
+readCaseInsensitiveBool :: ReadM Bool
+readCaseInsensitiveBool = maybeReader . asLower $ \case
+    "true"  -> Just True
+    "false" -> Just False
+    _       -> Nothing
 
 readNode :: ReadM Node
 readNode = str <&> \case
@@ -145,7 +151,7 @@ parseTagDirection =
     option readTagDirection
         $  long "tag-direction"
         <> help "Change the direction of tags"
-        <> value TagDirection.In
+        <> value TagDirection.Out
         <> showDefault
         <> metavar "In|Out|Both"
 

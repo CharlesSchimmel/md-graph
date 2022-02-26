@@ -6,18 +6,13 @@ import           Data.Text                     as T
 import           GHC.Generics                   ( Generic )
 
 data Node = Link { linkPath :: FilePath } | Tag { tagLabel :: Text }
-    deriving (Eq, Generic)
-
-instance Show Node where
-    show (Link l) = l
-    show (Tag  t) = T.unpack t
+    deriving (Eq, Generic, Show)
 
 instance Hashable Node where
 
-isLink (Link l) = True
-isLink _        = False
-
-isTag = not . isLink
+printNode :: Node -> String
+printNode (Tag  text) = T.unpack . T.concat $ ["#", text]
+printNode (Link path) = path
 
 nodePath :: Node -> Maybe FilePath
 nodePath (Link l) = Just l

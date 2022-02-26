@@ -23,28 +23,29 @@ main = do
     args    <- opts
     files   <- retrieveFiles (argDefExt args) (argLibrary args)
     links   <- parseNodes (argDefExt args) files
-    results <- doRun' (argCommand args) links $ S.fromList files
-    F.mapM_ P.putStrLn . P.map show . S.toList $ results
+    results <- runCommand (argCommand args) links $ S.fromList files
+    F.mapM_ P.putStrLn . P.map printNode . S.toList $ results
 
-doRun' :: Command -> [(Node, Node)] -> HashSet FilePath -> IO (HashSet Node)
+runCommand
+    :: Command -> [(Node, Node)] -> HashSet FilePath -> IO (HashSet Node)
 
-doRun' Orphans nodes allFiles = return $ orphans fwdMap bwdMap allFiles
+runCommand Orphans nodes allFiles = return $ orphans fwdMap bwdMap allFiles
     where (fwdMap, bwdMap) = buildMaps nodes
 
-doRun' Unreachable nodes allFiles = return $ stranded fwdMap bwdMap
+runCommand Unreachable nodes allFiles = return $ stranded fwdMap bwdMap
     where (fwdMap, bwdMap) = buildMaps nodes
 
-doRun' Nonexes nodes allFiles = do
+runCommand Nonexes nodes allFiles = do
     let (fwdMap, bwdMap) = buildMaps nodes
     results <- weirdos $ Corpus fwdMap bwdMap allFiles
     return $ nonex results
 
-doRun' Statics nodes allFiles = do
+runCommand Statics nodes allFiles = do
     let (fwdMap, bwdMap) = buildMaps nodes
     results <- weirdos $ Corpus fwdMap bwdMap allFiles
     return $ statix results
 
-doRun' (Subgraph (SubgraphOptions targets incNonex incStatic tagDir depth)) nodes allFiles
+runCommand (Subgraph (SubgraphOptions targets incNonex incStatic tagDir depth)) nodes allFiles
     = do
         (Weirdos statix nonex) <- weirdos $ Corpus fwdGraph bwdGraph allFiles
         return . withNonex nonex . withStatic statix $ subgraph depth
@@ -55,6 +56,6 @@ doRun' (Subgraph (SubgraphOptions targets incNonex incStatic tagDir depth)) node
     withNonex            = if incNonex then const id else flip S.difference
     withStatic           = if incStatic then const id else flip S.difference
 
-doRun' (Backlinks (BacklinkOptions targets depth)) nodes allFiles =
+runCommand (Backlinks (BacklinkOptions targets depth)) nodes allFiles =
     return $ subgraph depth bwdGraph targets
     where (fwdGraph, bwdGraph) = buildMaps nodes
