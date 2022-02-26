@@ -43,7 +43,7 @@ Available options:
   --inc-nonex True|False   Include non-existent files in output (default: False)
   --inc-static True|False  Include static files in output (default: True)
   --tag-direction In|Out|Both
-                           Change the direction of tags (default: In)
+                           Change the direction of tags (default: Out)
   --depth ARG              How deep traversal should go (default: -1)
   -h,--help                Show this help text
 ```
@@ -53,7 +53,7 @@ Available options:
 - `--inc-nonex=True|False` Default `False`. Includes non-existent files in 
     the output (files that were linked to but can not be resolved - includes 
     HTTP links)
-- `--tag-direction=In|Out|Both` Default `In`. Controls how tags are added to 
+- `--tag-direction=In|Out|Both` Default `Out`. Controls how tags are added to 
     the graph from the perspective of the tag.
     - `In`: The link is coming **in** to the tag from the file
     - `Out`: The link is from the tag **out** to the file
@@ -102,12 +102,12 @@ stack install
 - [x] Unreachables
 - [x] Ignore or include static files
 - [x] Ignore or include non-existent files
-- [ ] Configurable Depths
-- [ ] Tags
+- [x] Configurable Depths
+- [x] Tags
     - [x] As forward-linked
     - [x] As backward-linked
     - [x] As both/either
-    - [ ] Include tags in output
+    - [x] Include tags in output
 - [ ] Populate and query against a database
     - Populate on query
     - Watch with inotify
