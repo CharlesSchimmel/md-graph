@@ -5,6 +5,12 @@ Graph operations on a collection of interlinked Markdown (or
 [Zettlr](https://www.zettlr.com/), [Obsidian](https://obsidian.md/), or 
 [Neuron](https://obsidian.md/)) notes.
 
+md-graph seeks to enrich an existing library of interlinked notes but not change 
+how notes are written for the sake of its use. This enables interoperation with 
+other note systems as well as respecting note libraries that strive for 
+simplicity to remain evergreen.
+
+
 ## Usage
 ```
 md-graph - A utility for graph operations on a collection of markdown files
@@ -95,26 +101,6 @@ cd md-graph
 stack install
 ```
 
-## Features & Future Features
-- [x] Backlinks
-- [x] Orphans
-- [x] Subgraphs
-- [x] Unreachables
-- [x] Ignore or include static files
-- [x] Ignore or include non-existent files
-- [x] Configurable Depths
-- [x] Tags
-    - [x] As forward-linked
-    - [x] As backward-linked
-    - [x] As both/either
-    - [x] Include tags in output
-- [ ] Populate and query against a database
-    - Populate on query
-    - Watch with inotify
-- [ ] Ignore
-    - from a list
-    - from another subgraph
-
 ### Supported Formats
 #### Link Formats
 Because this merely parses out links, any format that uses markdown or wikilink 
@@ -134,4 +120,3 @@ would be a pain to have to manually trace the links between them in order to
 extract just the pertinent ones. This will take a root markdown file and 
 traverse its links, returning all of the files necessary to complete its 
 subgraph.
-
