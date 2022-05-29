@@ -7,8 +7,8 @@ Graph operations on a collection of interlinked Markdown (or
 
 md-graph seeks to enrich an existing library of interlinked notes but not change 
 how notes are written for the sake of its use. This enables interoperation with 
-other note systems as well as respecting note libraries that strive for 
-simplicity to remain evergreen.
+other note systems as well as respecting note libraries that strive to remain 
+evergreen by staying simple.
 
 
 ## Usage
@@ -39,6 +39,10 @@ Available commands:
     links)
 
 ### Subgraph
+A subgraph is the graph of a file built by following its links, its links' 
+links, etc. If `foo.md` links to `bar.md` and `baz.md`, and `bar.md` links to 
+`qux.md`, the subgraph of `foo.md` will be `foo.md bar.md baz.md qux.md`
+
 ```
 Usage: md-graph subgraph NODES [--inc-nonex True|False] [--inc-static True|False]
                                [--tag-direction In|Out|Both] [--depth ARG]
@@ -68,6 +72,10 @@ Available options:
     from the target NODES a subgraph should traverse.
 
 ### Backlinks
+Backlinks are the files that link to a given file. `foo.md` is a backlink of 
+`bar.md` if `foo.md` links to `bar.md`. It can also be thought of as the local 
+subgraph of a file with the arrows reversed.
+
 ```
 Usage: md-graph backlinks NODES [--depth ARG]
   The backlinks (reverse subgraph) of a node
