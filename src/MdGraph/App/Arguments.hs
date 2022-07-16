@@ -1,14 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Arguments
+module MdGraph.App.Arguments
     ( Arguments(..)
     , opts
     ) where
 
-import           Command
-import           File
-import           Node
-import           TagDirection
+import           MdGraph.App.Command
+import           MdGraph.File
+import           MdGraph.Node
+import           MdGraph.TagDirection as TagDirection
 
 import           Data.Char                     as C
                                                 ( toLower )

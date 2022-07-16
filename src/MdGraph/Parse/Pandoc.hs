@@ -1,8 +1,8 @@
-module PParser
+module MdGraph.Parse.Pandoc
     ( sieveLinks
     ) where
 
-import           Node
+import           MdGraph.Node
 
 import           Control.Applicative
 import           Data.HashSet                  as S

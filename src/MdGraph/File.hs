@@ -1,15 +1,18 @@
-module File
+module MdGraph.File
     ( reRelativize
     , traverseDir
     , fixLink
     , maybeFile
     , deepFiles
+    , retrieveFiles
     ) where
 
 import           Control.Applicative
+import           Control.Concurrent.Async       ( mapConcurrently )
 import           Control.Monad                  ( join )
 import           Control.Monad.Trans.Maybe
 import           Data.Foldable
+import           Data.Hashable                  ( Hashable )
 import           Data.Maybe
 import           Data.Traversable              as T
 import           Prelude                       as P
@@ -38,6 +41,8 @@ reRelativize source destination
 joinDir []    = ""
 joinDir paths = P.foldr1 (</>) paths
 
+-- Figure out if a path exists relative to the file it came from. Check if a
+-- path exists with extension, with reRelativization, with rerel and extension.
 fixLink :: FilePath -> FilePath -> FilePath -> IO FilePath
 fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
   where
@@ -79,15 +84,21 @@ getPathType path = do
 traverseDir :: FilePath -> IO (Maybe [FilePath])
 traverseDir path = do
     pathType <- getPathType path
-    T.sequence $ expand' <$> pathType
+    T.sequence $ expand <$> pathType
 
-expand' :: PathType -> IO [FilePath]
-expand' (  File path) = return [path]
-expand' p@(Dir  path) = do
+expand :: PathType -> IO [FilePath]
+expand (  File path) = return [path]
+expand p@(Dir  path) = do
     contents     <- fmap (path </>) <$> D.listDirectory path
-    contentTypes <- catMaybes <$> T.mapM getPathType contents
-    join <$> T.mapM expand' contentTypes
+    contentTypes <- catMaybes <$> mapConcurrently getPathType contents
+    join <$> mapConcurrently expand contentTypes
 
 deepFiles :: (Traversable f, Foldable f) => f FilePath -> IO [FilePath]
 deepFiles files = join . catMaybes . toList <$> T.mapM traverseDir files
+
+retrieveFiles
+    :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [FilePath]
+retrieveFiles defaultExt paths = do
+    files <- fmap normalise <$> deepFiles paths
+    return $ P.filter (F.isExtensionOf defaultExt) files
 

@@ -1,8 +1,9 @@
-module Graph where
+module MdGraph.Graph where
 
-import           HashSet
-import           Node
-import           TagDirection
+import           Aux.HashSet
+import           Aux.Tuple
+import           MdGraph.Node
+import           MdGraph.TagDirection
 
 import           Control.Applicative            ( (<|>) )
 import           Control.Monad                  ( foldM
@@ -13,7 +14,6 @@ import           Data.HashMap.Lazy              ( HashMap )
 import qualified Data.HashMap.Lazy             as M
 import           Data.HashSet                   ( HashSet )
 import qualified Data.HashSet                  as S
-import           Data.Hashable
 import           Data.List                     as L
 import           Data.Maybe
 import           Data.Text                     as T
@@ -42,6 +42,7 @@ subgraph :: Foldable f => Integer -> Graph -> f Node -> HashSet Node
 subgraph maxDepth graph targets =
     S.fromList $ (F.toList . dfs maxDepth graph) =<< F.toList targets
 
+-- | Depth First Search
 dfs :: Integer -> Graph -> Node -> HashSet Node
 dfs maxDepth graph file = go (0, maxDepth) graph S.empty file
   where
@@ -71,6 +72,3 @@ buildMaps edges = (fwdGraph, bwdGraph)
     bwdGraph     = mapFromPairs $ fmap swap edges
     fwdGraph     = mapFromPairs edges
     mapFromPairs = M.fromListWith S.union . fmap (toSnd S.singleton)
-
-toSnd :: (b -> c) -> (a, b) -> (a, c)
-toSnd fn (a, b) = (a, fn b)

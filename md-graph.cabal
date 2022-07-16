@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5bf59bce2d2d809d2cd58b43f1dbcee5c1860778428154ef93a1119fe5f52b2a
+-- hash: 64780d87b4002691413a3a1123b337dccce74211bd9285a2e5d51dded3c8ad2d
 
 name:           md-graph
 version:        0.1.0.0
@@ -27,28 +27,43 @@ source-repository head
 
 library
   exposed-modules:
-      File
-      Graph
-      HashSet
-      Lib
-      Node
-      PParser
-      TagDirection
+      Aux.HashSet
+      Aux.Tuple
+      MdGraph
+      MdGraph.App
+      MdGraph.App.Arguments
+      MdGraph.App.Command
+      MdGraph.File
+      MdGraph.Graph
+      MdGraph.Node
+      MdGraph.Parse
+      MdGraph.Parse.Pandoc
+      MdGraph.Persist.Schema
+      MdGraph.TagDirection
   other-modules:
       Paths_md_graph
   hs-source-dirs:
       src
-  default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
+  default-extensions:
+      OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
   build-depends:
-      base >=4.7 && <5
+      async
+    , base >=4.7 && <5
+    , cryptohash-md5
     , directory
     , filepath
     , hashable
+    , hashable-time
+    , mtl
     , network-uri
     , optparse-applicative
     , pandoc
     , pandoc-types
+    , persistent
+    , persistent-sqlite
+    , persistent-template
     , text
+    , time
     , transformers
     , unordered-containers
   default-language: Haskell2010
@@ -56,24 +71,31 @@ library
 executable md-graph
   main-is: Main.hs
   other-modules:
-      Arguments
-      Command
       Paths_md_graph
   hs-source-dirs:
       app
-  default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
+  default-extensions:
+      OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
   build-depends:
-      base >=4.7 && <5
+      async
+    , base >=4.7 && <5
+    , cryptohash-md5
     , directory
     , filepath
     , hashable
+    , hashable-time
     , md-graph
+    , mtl
     , network-uri
     , optparse-applicative
     , pandoc
     , pandoc-types
+    , persistent
+    , persistent-sqlite
+    , persistent-template
     , text
+    , time
     , transformers
     , unordered-containers
   default-language: Haskell2010
@@ -85,19 +107,28 @@ test-suite md-graph-test
       Paths_md_graph
   hs-source-dirs:
       test
-  default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
+  default-extensions:
+      OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      async
+    , base >=4.7 && <5
+    , cryptohash-md5
     , directory
     , filepath
     , hashable
+    , hashable-time
     , md-graph
+    , mtl
     , network-uri
     , optparse-applicative
     , pandoc
     , pandoc-types
+    , persistent
+    , persistent-sqlite
+    , persistent-template
     , text
+    , time
     , transformers
     , unordered-containers
   default-language: Haskell2010

@@ -23,14 +23,22 @@ default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, Flexible
 
 dependencies:
 - base >= 4.7 && < 5
+- async
+- cryptohash-md5
 - directory
 - filepath
 - hashable
+- hashable-time
+- mtl
 - network-uri
 - optparse-applicative
 - pandoc
 - pandoc-types
+- persistent
+- persistent-sqlite
+- persistent-template
 - text
+- time
 - transformers
 - unordered-containers
 

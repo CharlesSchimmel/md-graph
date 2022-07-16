@@ -1,4 +1,4 @@
-module HashSet where
+module Aux.HashSet where
 
 import           Data.HashSet                  as S
 import           Data.Hashable

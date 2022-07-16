@@ -1,11 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
-module Node where
+module MdGraph.Node where
+
+import           MdGraph.File                   ( fixLink )
 
 import           Data.Hashable
 import           Data.Text                     as T
+import           Data.Time                      ( UTCTime )
 import           GHC.Generics                   ( Generic )
 
-data Node = Link { linkPath :: FilePath } | Tag { tagLabel :: Text }
+data Node = Link { linkPath :: FilePath} | Tag { tagLabel :: Text }
     deriving (Eq, Generic, Show)
 
 instance Hashable Node where
@@ -21,3 +24,9 @@ nodePath _        = Nothing
 tagText :: Node -> Maybe Text
 tagText (Tag t) = Just t
 tagText _       = Nothing
+
+fixNode :: FilePath -> FilePath -> Node -> IO Node
+fixNode defExt source (  Link path) = Link <$> fixLink defExt source path
+fixNode _      _      t@(Tag  _   ) = pure t
+
+
