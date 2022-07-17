@@ -71,4 +71,4 @@ buildMaps edges = (fwdGraph, bwdGraph)
   where
     bwdGraph     = mapFromPairs $ fmap swap edges
     fwdGraph     = mapFromPairs edges
-    mapFromPairs = M.fromListWith S.union . fmap (toSnd S.singleton)
+    mapFromPairs = M.fromListWith S.union . fmap (mapSnd S.singleton)

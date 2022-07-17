@@ -7,6 +7,7 @@ module MdGraph.Persist where
 import           MdGraph.Persist.Schema
 
 import           Control.Monad                  ( mapM )
+import qualified Data.Map.Strict               as M
 import           Data.Text                      ( Text(..) )
 import           Database.Esqueleto.Experimental
 import           Database.Persist               ( Filter(..)
@@ -15,11 +16,23 @@ import           Database.Persist               ( Filter(..)
                                                 )
 import           Database.Persist.Sqlite        ( runSqlite )
 
+insertEdges :: Text -> [Edge] -> IO [Key Edge]
+insertEdges connString edges = runSqlite connString $ insertMany edges
+
+insertTags :: Text -> [Tag] -> IO [Key Tag]
+insertTags connString tags = runSqlite connString $ insertMany tags
+
+insertDocuments :: Text -> [Document] -> IO (M.Map (Key Document) Document)
+insertDocuments connString docs = runSqlite connString $ do
+    keys <- insertMany docs
+    getMany keys
+
 insertTempDocuments :: Text -> [TempDocument] -> IO [Key TempDocument]
 insertTempDocuments connString docs = runSqlite connString $ do
     deleteWhere ([] :: [Filter TempDocument])
     insertMany docs
 
+-- | Find items in Temp not in Doc
 modifiedFiles :: Text -> IO [(Entity Document, Entity TempDocument)]
 modifiedFiles connString = runSqlite connString $ select $ do
     (file :& tempFile) <-
@@ -31,17 +44,7 @@ modifiedFiles connString = runSqlite connString $ select $ do
         <. (tempFile ^. TempDocumentModifiedAt)
     pure (file, tempFile)
 
-deletedFiles :: Text -> IO [Entity Document]
-deletedFiles connString = runSqlite connString $ select $ do
-    (file :& tempFiles) <-
-        from
-        $          table @Document
-        `leftJoin` table @TempDocument
-        `on`       \(file :& tempFiles) ->
-                       just (file ^. DocumentPath) ==. tempFiles ?. TempDocumentPath
-    where_ $ isNothing (tempFiles ?. TempDocumentPath)
-    pure file
-
+-- | Find items in Temp not in Doc
 newFiles :: Text -> IO [Entity TempDocument]
 newFiles connString = runSqlite connString $ select $ do
     (tempFile :& file) <-
@@ -82,3 +85,24 @@ pruneDeletedDocuments connString = runSqlite connString $ delete $ do
             pure $ tf ^. TempDocumentPath
         )
 
+-- | Delete Docs where the TempDoc counterpart has a newer Modified
+-- | So that they can be find when newDocs is run (we will have to delete them
+-- | anyway)
+pruneModifiedDocs :: Text -> IO ()
+pruneModifiedDocs connString = runSqlite connString $ delete $ do
+    file <- from $ table @Document
+    where_ $ file ^. DocumentPath `in_` subSelectList
+        (do
+            (doc :& tempDoc) <-
+                from $ table @Document `InnerJoin` table @TempDocument `on` do
+                    \(doc :& tempDoc) ->
+                        (doc ^. DocumentPath ==. tempDoc ^. TempDocumentPath)
+                            &&. (  doc
+                                ^. DocumentModifiedAt
+                                <. tempDoc
+                                ^. TempDocumentModifiedAt
+                                )
+            pure $ doc ^. DocumentPath
+        )
+
+-- copyNewDocs connString = runSqlite connString $ insertEntityMany

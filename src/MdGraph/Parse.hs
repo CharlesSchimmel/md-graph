@@ -22,6 +22,8 @@ data ParseResult = ParseResult
     , tags  :: [Text]
     }
 
+-- TODO: mapConcurrently should be used by consumer of these functions
+
 parseDocuments :: FilePath -> [FilePath] -> IO [ParseResult]
 parseDocuments defExt files = parseDocuments' files
     >>= mapConcurrently fixLink'
@@ -33,6 +35,15 @@ parseDocuments defExt files = parseDocuments' files
 
 parseDocuments' :: [FilePath] -> IO [ParseResult]
 parseDocuments' = mapConcurrently $ \file -> do
+    parsedNodes <- parseFile file
+    let (links, tags) = partitionEithers . P.map sortNode $ parsedNodes
+    return $ ParseResult file links tags
+  where
+    sortNode (Link path) = Left path
+    sortNode (Tag  text) = Right text
+
+parseDocument :: FilePath -> IO ParseResult
+parseDocument file = do
     parsedNodes <- parseFile file
     let (links, tags) = partitionEithers . P.map sortNode $ parsedNodes
     return $ ParseResult file links tags
