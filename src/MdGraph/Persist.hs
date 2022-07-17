@@ -4,7 +4,6 @@
 
 module MdGraph.Persist where
 
-import           MdGraph.File                   ( Document(..) )
 import           MdGraph.Persist.Schema
 
 import           Control.Monad                  ( mapM )
@@ -16,45 +15,50 @@ import           Database.Persist               ( Filter(..)
                                                 )
 import           Database.Persist.Sqlite        ( runSqlite )
 
+insertTempDocuments :: Text -> [TempDocument] -> IO [Key TempDocument]
 insertTempDocuments connString docs = runSqlite connString $ do
-    deleteWhere ([] :: [Filter TempFile])
+    deleteWhere ([] :: [Filter TempDocument])
     insertMany docs
 
-modifiedFiles :: Text -> IO [(Entity File, Entity TempFile)]
+modifiedFiles :: Text -> IO [(Entity Document, Entity TempDocument)]
 modifiedFiles connString = runSqlite connString $ select $ do
-    (file :& tempFile) <- from $ table @File `InnerJoin` table @TempFile `on` do
-        \(file :& tempFile) -> file ^. FilePath ==. tempFile ^. TempFilePath
-    where_ $ (file ^. FileModifiedAt) <. (tempFile ^. TempFileModifiedAt)
+    (file :& tempFile) <-
+        from $ table @Document `InnerJoin` table @TempDocument `on` do
+            \(file :& tempFile) ->
+                file ^. DocumentPath ==. tempFile ^. TempDocumentPath
+    where_
+        $  (file ^. DocumentModifiedAt)
+        <. (tempFile ^. TempDocumentModifiedAt)
     pure (file, tempFile)
 
-deletedFiles :: Text -> IO [Entity File]
+deletedFiles :: Text -> IO [Entity Document]
 deletedFiles connString = runSqlite connString $ select $ do
     (file :& tempFiles) <-
         from
-        $          table @File
-        `leftJoin` table @TempFile
+        $          table @Document
+        `leftJoin` table @TempDocument
         `on`       \(file :& tempFiles) ->
-                       just (file ^. FilePath) ==. tempFiles ?. TempFilePath
-    where_ $ isNothing (tempFiles ?. TempFilePath)
+                       just (file ^. DocumentPath) ==. tempFiles ?. TempDocumentPath
+    where_ $ isNothing (tempFiles ?. TempDocumentPath)
     pure file
 
-newFiles :: Text -> IO [Entity TempFile]
+newFiles :: Text -> IO [Entity TempDocument]
 newFiles connString = runSqlite connString $ select $ do
     (tempFile :& file) <-
         from
-        $          table @TempFile
-        `leftJoin` table @File
+        $          table @TempDocument
+        `leftJoin` table @Document
         `on`       \(tempFile :& file) ->
-                       just (tempFile ^. TempFilePath) ==. file ?. FilePath
-    where_ $ isNothing (file ?. FilePath)
+                       just (tempFile ^. TempDocumentPath) ==. file ?. DocumentPath
+    where_ $ isNothing (file ?. DocumentPath)
     pure tempFile
 
 -- delete from file where not exist in tempfile
 pruneFiles connString filePaths = runSqlite connString $ delete $ do
-    file <- from $ table @File
-    where_ $ file ^. FilePath `notIn` subSelectList
+    file <- from $ table @Document
+    where_ $ file ^. DocumentPath `notIn` subSelectList
         (do
-            tf <- from $ table @TempFile
-            pure $ tf ^. TempFilePath
+            tf <- from $ table @TempDocument
+            pure $ tf ^. TempDocumentPath
         )
 

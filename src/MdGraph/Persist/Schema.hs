@@ -34,31 +34,29 @@ import           Database.Persist.TH
    Composite key of two files with uniqueness constraint
 -}
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-File
+Document
     path String
     modifiedAt UTCTime
 
-    UniquePath path
+    Primary path
     deriving Show
 
-TempFile
+TempDocument
     path String
     modifiedAt UTCTime
 
-    UniqueTempPath path
+    Primary path
     deriving Show
 
 Tag
     name String
-    file FileId
+    file DocumentId
 
-    Primary name file
-    UniqueTag name file
     deriving Show
 
 Edge
-    tail FileId
-    head FileId
+    tail DocumentId
+    head String
 
     Primary tail head
     UniqueEdge tail head

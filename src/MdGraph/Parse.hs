@@ -12,9 +12,7 @@ import           Data.Maybe                     ( fromMaybe )
 import           Data.Text                     as T
 import           Data.Text.IO                  as T
                                                 ( readFile )
-import           MdGraph.File                   ( Document(..)
-                                                , fixLink
-                                                )
+import           MdGraph.File                   ( fixLink )
 import           Prelude                       as P
 import           System.Directory               ( getModificationTime )
 

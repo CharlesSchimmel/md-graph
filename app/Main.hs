@@ -2,11 +2,12 @@ module Main where
 
 import           MdGraph.App.Arguments
 import           MdGraph.App.Command            ( runCommand )
-import           MdGraph.File                   ( findDocuments, toTempFile )
+import           MdGraph.File                   ( findDocuments )
 import           MdGraph.Node                   ( printNode )
 import           MdGraph.Parse                  ( parseDocuments )
 import           MdGraph.Persist                ( insertTempDocuments, newFiles, modifiedFiles, deletedFiles )
 import           MdGraph.Persist.Schema         ( migrateMdGraph )
+import           MdGraph.Persist.Mapper         as Mapper (FromFile(..))
 
 import           Data.Foldable                 as F
                                                 ( mapM_ )
@@ -30,7 +31,7 @@ main = do
     docs           <- findDocuments argDefExt argLibrary
     migrateMdGraph argDatabase
     -- load documents into temp
-    insertTempDocuments argDatabase $ toTempFile <$> docs
+    insertTempDocuments argDatabase $ Mapper.fromFile <$> docs
     -- find new, modified, deleted documents
     -- prune deleted documents and their edges
     -- pruned modified documents edges

@@ -1,9 +1,7 @@
 module MdGraph.File
     ( fixLink
     , findDocuments
-    , Document(..)
-    , toFile
-    , toTempFile
+    , File(..)
     ) where
 
 import           Control.Applicative
@@ -15,27 +13,15 @@ import           Data.Hashable                  ( Hashable )
 import           Data.Maybe
 import           Data.Time                      ( UTCTime )
 import           Data.Traversable              as T
-import qualified MdGraph.Persist.Schema        as Persist
-                                                ( File(File)
-                                                , TempFile(TempFile)
-                                                )
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
-data Document = Document
+data File = File
     { filePath         :: FilePath
     , modificationTime :: UTCTime
     }
     deriving (Show, Ord, Eq)
-
-toTempFile :: Document -> Persist.TempFile
-toTempFile Document { filePath, modificationTime } =
-    Persist.TempFile filePath modificationTime
-
-toFile :: Document -> Persist.File
-toFile Document { filePath, modificationTime } =
-    Persist.File filePath modificationTime
 
 doubleDot :: FilePath
 doubleDot = ".."
@@ -90,15 +76,14 @@ maybeFile file = do
     pure $ if exists then Just file else Nothing
 
 findDocuments
-    :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [Document]
+    :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [File]
 findDocuments defaultExt sourcePaths = do
     documents <- deepFiles defaultExt sourcePaths
     return $ normaliseDoc <$> documents
   where
-    normaliseDoc doc@Document { filePath } =
-        doc { filePath = normalise filePath }
+    normaliseDoc doc@File { filePath } = doc { filePath = normalise filePath }
 
-data PathType = File FilePath | Dir FilePath deriving Show
+data PathType = F FilePath | D FilePath deriving Show
 
 getPathType :: FilePath -> IO (Maybe PathType)
 getPathType path = do
@@ -106,29 +91,28 @@ getPathType path = do
     isFile <- D.doesFileExist path
     if not exists
         then return Nothing
-        else return . Just $ if isFile then File path else Dir path
+        else return . Just $ if isFile then F path else D path
 
-traverseDir :: FilePath -> FilePath -> IO (Maybe [Document])
+traverseDir :: FilePath -> FilePath -> IO (Maybe [File])
 traverseDir extension path = do
     pathType <- getPathType path
     T.sequence $ expand extension <$> pathType
 
-expand :: FilePath -> PathType -> IO [Document]
+expand :: FilePath -> PathType -> IO [File]
 expand extension path = go path
   where
-    go :: PathType -> IO [Document]
-    go (File path) = if not . F.isExtensionOf extension $ path
+    go :: PathType -> IO [File]
+    go (F path) = if not . F.isExtensionOf extension $ path
         then return []
         else do
             modAt <- getModificationTime path
-            return [Document path modAt]
-    go p@(Dir path) = do
+            return [File path modAt]
+    go p@(D path) = do
         contents     <- fmap (path </>) <$> D.listDirectory path
         contentTypes <- catMaybes <$> mapConcurrently getPathType contents
         join <$> mapConcurrently go contentTypes
 
-deepFiles
-    :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [Document]
+deepFiles :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [File]
 deepFiles extension sourcePath = join . catMaybes . toList <$> T.forM
     sourcePath
     (\file -> do
@@ -139,7 +123,7 @@ deepFiles extension sourcePath = join . catMaybes . toList <$> T.forM
 
 -- | TODO: probably need to only accept a single library dir instead of multiple
 -- | or we could run into filepath collisions.
-relativizeDocument :: FilePath -> Document -> Document
-relativizeDocument baseDir doc@Document { filePath } =
+relativizeDocument :: FilePath -> File -> File
+relativizeDocument baseDir doc@File { filePath } =
     doc { filePath = makeRelative baseDir filePath }
 
