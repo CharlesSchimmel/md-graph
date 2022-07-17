@@ -67,8 +67,20 @@ opts =
 
 parseArguments :: Parser Arguments
 parseArguments =
-    Arguments <$> parseLibrary <*> parseDefaultExt <*> parseCommand <*> pure
-        "test.db"
+    Arguments
+        <$> parseLibrary
+        <*> parseDefaultExt
+        <*> parseCommand
+        <*> parseDatabase
+
+parseDatabase :: Parser Text
+parseDatabase = T.pack <$> strOption
+    (  long "database"
+    <> short 'd'
+    <> help "Sqlite database to be used"
+    <> metavar "DB"
+    <> value ":memory:"
+    )
 
 parseLibrary :: Parser FilePath
 parseLibrary = strOption
