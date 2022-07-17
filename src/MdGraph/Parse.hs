@@ -8,6 +8,8 @@ import           MdGraph.Parse.Pandoc
 
 import           Control.Concurrent.Async       ( mapConcurrently )
 import           Data.Either                    ( partitionEithers )
+import qualified Data.HashSet                  as S
+                                                ( toList )
 import           Data.Maybe                     ( fromMaybe )
 import           Data.Text                     as T
 import           Data.Text.IO                  as T
@@ -22,8 +24,8 @@ import           Text.Pandoc                    ( PandocMonad(fileExists) )
 
 data ParseResult = ParseResult
     { file  :: FilePath
-    , links :: [FilePath]
-    , tags  :: [Text]
+    , links :: [Link]
+    , tags  :: [Tag]
     }
     deriving Show
 
@@ -35,17 +37,14 @@ parseDocument defExt libraryPath file = do
     if not exists
         then return Nothing
         else do
-            parsedNodes <- parseFile absFile
-            let (links, tags) = partitionEithers . P.map sortNode $ parsedNodes
-            return . Just $ ParseResult file links tags
+            fileContent <- T.readFile file
+            return $ do
+                PandocResult { tags, links } <- sieveLinks fileContent
+                return $ ParseResult file (S.toList links) (S.toList tags)
   where
     absFile = libraryPath </> file
-    sortNode (Link path) = Left path
-    sortNode (Tag  text) = Right text
-
-
-parseFile :: FilePath -> IO [Node]
-parseFile file = do
-    content <- sieveLinks <$> T.readFile file
-    return $ fromMaybe [] content
+    parseFile :: FilePath -> IO PandocResult
+    parseFile file = do
+        content <- sieveLinks <$> T.readFile file
+        return $ fromMaybe mempty content
 

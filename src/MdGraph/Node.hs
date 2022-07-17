@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+
 module MdGraph.Node where
 
 import           MdGraph.File                   ( fixLink )
@@ -8,20 +9,17 @@ import           Data.Text                     as T
 import           Data.Time                      ( UTCTime )
 import           GHC.Generics                   ( Generic )
 
-data Node = Link { linkPath :: FilePath} | Tag { tagLabel :: Text }
+data Link = Link
+    { linkPath :: FilePath
+    , linkText :: Text
+    }
     deriving (Eq, Generic, Show)
 
-instance Hashable Node where
+instance Hashable Link
 
-printNode :: Node -> String
-printNode (Tag  text) = T.unpack . T.concat $ ["#", text]
-printNode (Link path) = path
+data Tag = Tag
+    { tagLabel :: Text
+    }
+    deriving (Eq, Generic, Show)
 
-nodePath :: Node -> Maybe FilePath
-nodePath (Link l) = Just l
-nodePath _        = Nothing
-
-tagText :: Node -> Maybe Text
-tagText (Tag t) = Just t
-tagText _       = Nothing
-
+instance Hashable Tag

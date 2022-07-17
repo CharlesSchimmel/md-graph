@@ -60,6 +60,7 @@ Tag
 Edge
     tail DocumentId OnDeleteCascade OnUpdateCascade
     head String
+    label String
     Primary tail head
     UniqueEdge tail head
 

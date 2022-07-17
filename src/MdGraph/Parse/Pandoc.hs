@@ -1,12 +1,13 @@
 module MdGraph.Parse.Pandoc
     ( sieveLinks
+    , PandocResult(..)
     ) where
 
-import           MdGraph.Node
 
 import           Control.Applicative
 import           Data.HashSet                  as S
 import           Data.Text                     as T
+import           MdGraph.Node
 import qualified Network.URI                   as URI
                                                 ( unEscapeString )
 import           Prelude                       as P
@@ -24,29 +25,44 @@ import           Text.Pandoc.Readers            ( readMarkdown
                                                 )
 import           Text.Pandoc.Walk               ( query )
 
-sieveLinks :: Text -> Maybe [Node]
-sieveLinks content = either (const Nothing) (Just . S.toList) allLinks
-  where
-    mdLinks  = extractMarkdownLinks content
-    vwLinks  = extractVimWikiLinks content
-    tags     = query extractHashTag <$> (runPure . readVimwiki def $ content)
-    fUnion   = liftA2 S.union
-    allLinks = mdLinks `fUnion` vwLinks `fUnion` tags
+data PandocResult = PandocResult
+    { tags  :: HashSet Tag
+    , links :: HashSet Link
+    }
+    deriving (Eq, Show)
 
-extractUrl :: Inline -> HashSet Node
-extractUrl (Pandoc.Link _ _ (path, title)) =
-    -- pandoc URI escapes (%20) markdown links
-    S.singleton . Link . URI.unEscapeString . T.unpack $ ignoreAnchors path
+singleTag tag = PandocResult { tags = S.singleton tag, links = S.empty }
+singleLink link = PandocResult { tags = S.empty, links = S.singleton link }
+
+instance Semigroup PandocResult where
+    (<>) PandocResult { tags = tagsA, links = linksA } PandocResult { tags = tagsB, links = linksB }
+        = PandocResult (tagsA <> tagsB) (linksA <> linksB)
+
+instance Monoid PandocResult where
+    mempty = PandocResult mempty mempty
+
+-- TODO: Unhush this error
+sieveLinks :: Text -> Maybe PandocResult
+sieveLinks content = either (const Nothing) Just $ do
+    mdLinks <- extractMarkdownLinks content
+    vwLinks <- extractVimWikiLinks content
+    tags    <- extractTags content
+    return $ PandocResult tags (mdLinks <> vwLinks)
+
+-- TODO: does pandoc URI %20 escape markdown links?
+extractUrl :: Inline -> HashSet Link
+extractUrl (Pandoc.Link _ _ (path, title)) = S.singleton
+    $ Link (URI.unEscapeString . T.unpack $ ignoreAnchors path) title
 -- if you've got anchors in your image URLs what are you doing
 extractUrl (Image _ _ (path, title)) =
-    S.singleton . Link . T.unpack $ ignoreAnchors path
+    S.singleton $ Link (T.unpack $ ignoreAnchors path) title
 extractUrl _ = S.empty
 
 ignoreAnchors :: Text -> Text
 ignoreAnchors = T.takeWhile (/= '#')
 
 -- Pandoc splits Str on whitespace; they are whitespace-less
-extractHashTag :: Inline -> HashSet Node
+extractHashTag :: Inline -> HashSet Tag
 extractHashTag (Str tag) = case T.uncons tag of
     Just ('#', tagText) -> if T.all isValidTagChar tagText
         then S.singleton $ Tag tagText
@@ -59,8 +75,11 @@ extractHashTag (Str tag) = case T.uncons tag of
     isValidTagChar = flip S.member validTagChars
 extractHashTag _ = S.empty
 
-extractMarkdownLinks :: Text -> Either PandocError (HashSet Node)
+extractMarkdownLinks :: Text -> Either PandocError (HashSet Link)
 extractMarkdownLinks t = query extractUrl <$> (runPure . readMarkdown def $ t)
 
-extractVimWikiLinks :: Text -> Either PandocError (HashSet Node)
+extractVimWikiLinks :: Text -> Either PandocError (HashSet Link)
 extractVimWikiLinks t = query extractUrl <$> (runPure . readVimwiki def $ t)
+
+extractTags content =
+    query extractHashTag <$> (runPure . readVimwiki def $ content)

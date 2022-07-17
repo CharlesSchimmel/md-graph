@@ -4,6 +4,7 @@ module MdGraph.Persist.Mapper where
 import qualified Data.Text                     as T
 import           Data.Traversable               ( for )
 import qualified MdGraph.File                  as Dto
+import qualified MdGraph.Node                  as Node
 import           MdGraph.Parse                  ( ParseResult(..) )
 import           MdGraph.Persist.Schema
 
@@ -29,8 +30,20 @@ class FromParseResult a where
   fromParseResult :: Key Document -> ParseResult -> a
 
 instance FromParseResult [Edge] where
-    fromParseResult docKey ParseResult { links } = map (Edge docKey) links
+    fromParseResult docKey ParseResult { links } =
+        map (fromNodeLink docKey) links
 
 instance FromParseResult [Tag] where
     fromParseResult docKey ParseResult { tags } =
-        map ((\tag -> Tag tag docKey) . T.unpack) $ tags
+        map (fromNodeTag docKey) $ tags
+
+fromNodeTag :: Key Document -> Node.Tag -> Tag
+fromNodeTag docKey Node.Tag { tagLabel } =
+    Tag { tagName = T.unpack tagLabel, tagFile = docKey }
+
+fromNodeLink :: Key Document -> Node.Link -> Edge
+fromNodeLink docKey Node.Link { linkPath, linkText } = Edge
+    { edgeTail  = docKey
+    , edgeHead  = linkPath
+    , edgeLabel = T.unpack linkText
+    }
