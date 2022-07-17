@@ -108,7 +108,7 @@ parseDepth def =
         <> showDefault
         <> value def
 
-parseSubgraphTargets :: Parser [Node]
+parseSubgraphTargets :: Parser [SubgraphTarget]
 parseSubgraphTargets = some $ argument
     readNode
     (metavar "NODES" <> help "Nodes (files or #tags) to process")
@@ -137,10 +137,10 @@ readCaseInsensitiveBool = maybeReader . asLower $ \case
     "false" -> Just False
     _       -> Nothing
 
-readNode :: ReadM Node
+readNode :: ReadM SubgraphTarget
 readNode = str <&> \case
-    ('#' : tagText) -> Tag $ T.pack tagText
-    file            -> Link $ normalise file
+    ('#' : tagText) -> TagTarget tagText
+    file            -> FileTarget $ normalise file
 
 asLower :: (String -> b) -> String -> b
 asLower fn = fn . fmap C.toLower

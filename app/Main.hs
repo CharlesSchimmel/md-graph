@@ -2,9 +2,7 @@ module Main where
 
 import           Aux.Map                       as M
 import           MdGraph.App.Arguments
-import           MdGraph.App.Command            ( runCommand )
 import           MdGraph.File                   ( findDocuments )
-import           MdGraph.Node                   ( printNode )
 import           MdGraph.Parse                  ( ParseResult(..)
                                                 , parseDocument
                                                 )
