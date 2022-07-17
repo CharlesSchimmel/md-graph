@@ -14,7 +14,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-
 module MdGraph.Persist.Schema where
 
 import           Control.Monad.IO.Class         ( MonadIO

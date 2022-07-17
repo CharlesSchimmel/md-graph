@@ -1,5 +1,5 @@
 module MdGraph.Parse
-    ( parseDocuments
+    ( parseDocument
     , ParseResult(..)
     ) where
 
@@ -14,42 +14,35 @@ import           Data.Text.IO                  as T
                                                 ( readFile )
 import           MdGraph.File                   ( fixLink )
 import           Prelude                       as P
-import           System.Directory               ( getModificationTime )
+import           System.Directory               ( doesFileExist
+                                                , getModificationTime
+                                                )
+import           System.FilePath                ( (</>) )
+import           Text.Pandoc                    ( PandocMonad(fileExists) )
 
 data ParseResult = ParseResult
     { file  :: FilePath
     , links :: [FilePath]
     , tags  :: [Text]
     }
+    deriving Show
 
 -- TODO: mapConcurrently should be used by consumer of these functions
 
-parseDocuments :: FilePath -> [FilePath] -> IO [ParseResult]
-parseDocuments defExt files = parseDocuments' files
-    >>= mapConcurrently fixLink'
+parseDocument :: FilePath -> FilePath -> FilePath -> IO (Maybe ParseResult)
+parseDocument defExt libraryPath file = do
+    exists <- doesFileExist absFile
+    if not exists
+        then return Nothing
+        else do
+            parsedNodes <- parseFile absFile
+            let (links, tags) = partitionEithers . P.map sortNode $ parsedNodes
+            return . Just $ ParseResult file links tags
   where
-    fixLink' lx@ParseResult { file, links } = do
-        fixed <- P.mapM (fixLink defExt file) links
-        return $ lx { links = fixed }
-
-
-parseDocuments' :: [FilePath] -> IO [ParseResult]
-parseDocuments' = mapConcurrently $ \file -> do
-    parsedNodes <- parseFile file
-    let (links, tags) = partitionEithers . P.map sortNode $ parsedNodes
-    return $ ParseResult file links tags
-  where
+    absFile = libraryPath </> file
     sortNode (Link path) = Left path
     sortNode (Tag  text) = Right text
 
-parseDocument :: FilePath -> IO ParseResult
-parseDocument file = do
-    parsedNodes <- parseFile file
-    let (links, tags) = partitionEithers . P.map sortNode $ parsedNodes
-    return $ ParseResult file links tags
-  where
-    sortNode (Link path) = Left path
-    sortNode (Tag  text) = Right text
 
 parseFile :: FilePath -> IO [Node]
 parseFile file = do

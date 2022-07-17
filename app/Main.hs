@@ -6,7 +6,7 @@ import           MdGraph.App.Command            ( runCommand )
 import           MdGraph.File                   ( findDocuments )
 import           MdGraph.Node                   ( printNode )
 import           MdGraph.Parse                  ( ParseResult(..)
-                                                , parseDocuments
+                                                , parseDocument
                                                 )
 import           MdGraph.Persist
 import           MdGraph.Persist.Mapper        as Mapper
@@ -17,6 +17,7 @@ import           MdGraph.Persist.Schema         ( Document(documentPath)
                                                 , migrateMdGraph
                                                 )
 
+import           Control.Concurrent.Async       ( mapConcurrently )
 import           Control.Monad                  ( forM )
 import           Data.Foldable                 as F
                                                 ( mapM_ )
@@ -25,6 +26,7 @@ import           Data.HashSet                  as S
                                                 , toList
                                                 )
 import qualified Data.Map.Strict               as M
+import           Data.Maybe                     ( catMaybes )
 import           Database.Persist.Sqlite        ( Entity(entityVal)
                                                 , runSqlite
                                                 )
@@ -40,7 +42,7 @@ main :: IO ()
 main = do
     Arguments {..} <- opts
     -- find documents
-    docs           <- findDocuments argDefExt argLibrary
+    docs           <- findDocuments argDefExt [argLibrary]
     migrateMdGraph argDatabase
     -- load documents into temp
     insertTempDocuments argDatabase $ Mapper.fromFile <$> docs
@@ -56,7 +58,9 @@ main = do
     newDocs <- insertDocuments argDatabase docsToInsert
     let docKeyMap   = M.flop documentPath newDocs
         docsToParse = M.keys docKeyMap
-    parseResults <- parseDocuments argDefExt docsToParse
+    parseResults <-
+        catMaybes
+            <$> mapConcurrently (parseDocument argDefExt argLibrary) docsToParse
     let resultMap = M.fromList' file parseResults
         pathToKeyResult =
             Prelude.map snd . M.toList $ M.unionWith' docKeyMap resultMap
@@ -73,11 +77,8 @@ main = do
             ([], [])
             newTagsAndEdges
 
+    -- P.print newEdges
     insertEdges argDatabase newEdges
     insertTags argDatabase newTags
 
-    P.print docs
-    -- links   <- parseDocuments (argDefExt args) docs
     P.putStrLn "Quack"
-    -- results <- runCommand (argCommand args) links $ S.fromList links
-    -- F.mapM_ P.putStrLn . P.map printNode . S.toList $ results

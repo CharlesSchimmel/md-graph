@@ -23,7 +23,7 @@ import           System.FilePath               as F
 
 
 data Arguments = Arguments
-    { argLibrary  :: [FilePath]
+    { argLibrary  :: FilePath
     , argDefExt   :: FilePath
     , argCommand  :: Command
     , argDatabase :: Text
@@ -70,18 +70,15 @@ parseArguments =
     Arguments <$> parseLibrary <*> parseDefaultExt <*> parseCommand <*> pure
         "test.db"
 
-parseLibrary :: Parser [FilePath]
-parseLibrary =
-    fromMaybe (["./"])
-        <$> (optional $ some
-                (strOption
-                    (  long "library"
-                    <> short 'l'
-                    <> help "Files or directories to parse"
-                    <> metavar "FILE|DIR"
-                    )
-                )
-            )
+parseLibrary :: Parser FilePath
+parseLibrary = strOption
+    (  long "library"
+    <> short 'l'
+    <> help "Directory to search"
+    <> metavar "FILE|DIR"
+    <> value "./"
+    )
+
 
 parseDefaultExt :: Parser FilePath
 parseDefaultExt = P.dropWhile (== '.') <$> strOption
