@@ -53,8 +53,28 @@ newFiles connString = runSqlite connString $ select $ do
     where_ $ isNothing (file ?. DocumentPath)
     pure tempFile
 
--- delete from file where not exist in tempfile
-pruneFiles connString filePaths = runSqlite connString $ delete $ do
+-- | Must be called after pruneDeletedDocuments!
+-- | Delete TempDocs that have not been modified
+pruneUnchangedTempDocs connString = runSqlite connString $ delete $ do
+    tempDoc <- from $ table @TempDocument
+    where_ $ tempDoc ^. TempDocumentPath `in_` subSelectList
+        (do
+            (doc :& tempDoc) <-
+                from $ table @Document `InnerJoin` table @TempDocument `on` do
+                    \(doc :& tempDoc) ->
+                        (doc ^. DocumentPath ==. tempDoc ^. TempDocumentPath)
+                            &&. (   doc
+                                ^.  DocumentModifiedAt
+                                ==. tempDoc
+                                ^.  TempDocumentModifiedAt
+                                )
+            pure $ doc ^. DocumentPath
+        )
+
+-- | Must be called before pruneUnchangedTempDocs!
+-- | Delete Docmuments not found in most recent scan
+-- | This should cascade to a document's Tags and Edges
+pruneDeletedDocuments connString = runSqlite connString $ delete $ do
     file <- from $ table @Document
     where_ $ file ^. DocumentPath `notIn` subSelectList
         (do

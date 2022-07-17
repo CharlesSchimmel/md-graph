@@ -5,9 +5,15 @@ import           MdGraph.App.Command            ( runCommand )
 import           MdGraph.File                   ( findDocuments )
 import           MdGraph.Node                   ( printNode )
 import           MdGraph.Parse                  ( parseDocuments )
-import           MdGraph.Persist                ( insertTempDocuments, newFiles, modifiedFiles, deletedFiles )
+import           MdGraph.Persist                ( insertTempDocuments
+                                                , modifiedFiles
+                                                , newFiles
+                                                , pruneDeletedDocuments
+                                                , pruneUnchangedTempDocs
+                                                )
+import           MdGraph.Persist.Mapper        as Mapper
+                                                ( FromFile(..) )
 import           MdGraph.Persist.Schema         ( migrateMdGraph )
-import           MdGraph.Persist.Mapper         as Mapper (FromFile(..))
 
 import           Data.Foldable                 as F
                                                 ( mapM_ )
@@ -32,13 +38,15 @@ main = do
     migrateMdGraph argDatabase
     -- load documents into temp
     insertTempDocuments argDatabase $ Mapper.fromFile <$> docs
+
+    pruneDeletedDocuments argDatabase
+    pruneUnchangedTempDocs argDatabase
+
     -- find new, modified, deleted documents
-    -- prune deleted documents and their edges
     -- pruned modified documents edges
     -- parse new documents and insert
-    newDocs <- newFiles argDatabase
+    newDocs      <- newFiles argDatabase
     modifiedDocs <- modifiedFiles argDatabase
-    deletedDocs <- deletedFiles argDatabase
     P.print docs
     -- links   <- parseDocuments (argDefExt args) docs
     P.putStrLn "Quack"

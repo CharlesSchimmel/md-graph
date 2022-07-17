@@ -31,8 +31,9 @@ import           Database.Persist.TH
    Tag:
    Composite key of name and file with uniqueness constraint
 
-   Edge:
-   Composite key of two files with uniqueness constraint
+   Edge: Composite key of two files with uniqueness constraint. Trying to use
+   "proper" graph terms: "tail" is the source file, "head" is what it's
+   referencing
 -}
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Document
