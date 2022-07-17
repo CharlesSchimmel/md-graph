@@ -25,8 +25,3 @@ tagText :: Node -> Maybe Text
 tagText (Tag t) = Just t
 tagText _       = Nothing
 
-fixNode :: FilePath -> FilePath -> Node -> IO Node
-fixNode defExt source (  Link path) = Link <$> fixLink defExt source path
-fixNode _      _      t@(Tag  _   ) = pure t
-
-

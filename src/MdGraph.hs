@@ -1,6 +1,5 @@
 module MdGraph
-    ( corpus
-    , Weirdos(..)
+    ( Weirdos(..)
     , weirdos
     ) where
 
@@ -29,14 +28,6 @@ import           Data.Tuple
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
-
-corpus :: FilePath -> TagDirection -> NonEmpty FilePath -> IO Corpus
-corpus validExt tagDir paths = do
-    files     <- retrieveFiles validExt paths
-    nodePairs <- parseNodes validExt files
-    let tagDirectionAdjustedNodePairs = nodePairs >>= tagSwap tagDir
-        (fwdMap, bwdMap)              = buildMaps tagDirectionAdjustedNodePairs
-    return $ Corpus fwdMap bwdMap (S.fromList files)
 
 data Weirdos = Weirdos
     { statix :: HashSet Node

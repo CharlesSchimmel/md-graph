@@ -26,6 +26,7 @@ dependencies:
 - async
 - cryptohash-md5
 - directory
+- esqueleto
 - filepath
 - hashable
 - hashable-time

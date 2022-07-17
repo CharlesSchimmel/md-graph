@@ -36,10 +36,18 @@ import           Database.Persist.TH
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 File
     path String
-    lastModified UTCTime
+    modifiedAt UTCTime
 
     UniquePath path
     deriving Show
+
+TempFile
+    path String
+    modifiedAt UTCTime
+
+    UniqueTempPath path
+    deriving Show
+
 Tag
     name String
     file FileId
@@ -47,6 +55,7 @@ Tag
     Primary name file
     UniqueTag name file
     deriving Show
+
 Edge
     tail FileId
     head FileId
@@ -56,11 +65,4 @@ Edge
     deriving Show
 |]
 
-
--- main :: IO ()
--- main = runSqlite "test.db" $ do
---     runMigration migrateAll
---     now   <- liftIO $ getCurrentTime
---     newId <- Sql.insert $ File "aoeuaoeu" now
---     liftIO $ P.print newId
-
+migrateMdGraph dbFile = runSqlite dbFile $ runMigration migrateAll

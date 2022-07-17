@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 64780d87b4002691413a3a1123b337dccce74211bd9285a2e5d51dded3c8ad2d
+-- hash: 2dbfdf6331eea9726ddb67a8add35d36f2bb3abb0c8fc52cbeb7c1f429c74031
 
 name:           md-graph
 version:        0.1.0.0
@@ -38,6 +38,7 @@ library
       MdGraph.Node
       MdGraph.Parse
       MdGraph.Parse.Pandoc
+      MdGraph.Persist
       MdGraph.Persist.Schema
       MdGraph.TagDirection
   other-modules:
@@ -51,6 +52,7 @@ library
     , base >=4.7 && <5
     , cryptohash-md5
     , directory
+    , esqueleto
     , filepath
     , hashable
     , hashable-time
@@ -82,6 +84,7 @@ executable md-graph
     , base >=4.7 && <5
     , cryptohash-md5
     , directory
+    , esqueleto
     , filepath
     , hashable
     , hashable-time
@@ -115,6 +118,7 @@ test-suite md-graph-test
     , base >=4.7 && <5
     , cryptohash-md5
     , directory
+    , esqueleto
     , filepath
     , hashable
     , hashable-time

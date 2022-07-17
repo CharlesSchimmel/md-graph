@@ -1,14 +1,13 @@
 module MdGraph.App.Command where
 
-import           MdGraph.File                           ( retrieveFiles )
-import           MdGraph.Graph
 import           Aux.HashSet
 import           MdGraph
+import           MdGraph.Graph
 import           MdGraph.Node
 import           MdGraph.TagDirection
 
+import           Data.HashSet                  as S
 import           Data.List.NonEmpty
-import Data.HashSet as S
 
 data Command =
     Orphans

@@ -8,7 +8,7 @@ module MdGraph.App.Arguments
 import           MdGraph.App.Command
 import           MdGraph.File
 import           MdGraph.Node
-import           MdGraph.TagDirection as TagDirection
+import           MdGraph.TagDirection          as TagDirection
 
 import           Data.Char                     as C
                                                 ( toLower )
@@ -23,9 +23,10 @@ import           System.FilePath               as F
 
 
 data Arguments = Arguments
-    { argLibrary :: [FilePath]
-    , argDefExt  :: FilePath
-    , argCommand :: Command
+    { argLibrary  :: [FilePath]
+    , argDefExt   :: FilePath
+    , argCommand  :: Command
+    , argDatabase :: Text
     }
     deriving Show
 
@@ -66,7 +67,8 @@ opts =
 
 parseArguments :: Parser Arguments
 parseArguments =
-    Arguments <$> parseLibrary <*> parseDefaultExt <*> parseCommand
+    Arguments <$> parseLibrary <*> parseDefaultExt <*> parseCommand <*> pure
+        "test.db"
 
 parseLibrary :: Parser [FilePath]
 parseLibrary =

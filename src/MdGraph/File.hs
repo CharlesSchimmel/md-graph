@@ -1,10 +1,9 @@
 module MdGraph.File
-    ( reRelativize
-    , traverseDir
-    , fixLink
-    , maybeFile
-    , deepFiles
-    , retrieveFiles
+    ( fixLink
+    , findDocuments
+    , Document(..)
+    , toFile
+    , toTempFile
     ) where
 
 import           Control.Applicative
@@ -14,10 +13,29 @@ import           Control.Monad.Trans.Maybe
 import           Data.Foldable
 import           Data.Hashable                  ( Hashable )
 import           Data.Maybe
+import           Data.Time                      ( UTCTime )
 import           Data.Traversable              as T
+import qualified MdGraph.Persist.Schema        as Persist
+                                                ( File(File)
+                                                , TempFile(TempFile)
+                                                )
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
+
+data Document = Document
+    { filePath         :: FilePath
+    , modificationTime :: UTCTime
+    }
+    deriving (Show, Ord, Eq)
+
+toTempFile :: Document -> Persist.TempFile
+toTempFile Document { filePath, modificationTime } =
+    Persist.TempFile filePath modificationTime
+
+toFile :: Document -> Persist.File
+toFile Document { filePath, modificationTime } =
+    Persist.File filePath modificationTime
 
 doubleDot :: FilePath
 doubleDot = ".."
@@ -71,6 +89,15 @@ maybeFile file = do
     exists <- D.doesFileExist file
     pure $ if exists then Just file else Nothing
 
+findDocuments
+    :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [Document]
+findDocuments defaultExt sourcePaths = do
+    documents <- deepFiles defaultExt sourcePaths
+    return $ normaliseDoc <$> documents
+  where
+    normaliseDoc doc@Document { filePath } =
+        doc { filePath = normalise filePath }
+
 data PathType = File FilePath | Dir FilePath deriving Show
 
 getPathType :: FilePath -> IO (Maybe PathType)
@@ -81,24 +108,38 @@ getPathType path = do
         then return Nothing
         else return . Just $ if isFile then File path else Dir path
 
-traverseDir :: FilePath -> IO (Maybe [FilePath])
-traverseDir path = do
+traverseDir :: FilePath -> FilePath -> IO (Maybe [Document])
+traverseDir extension path = do
     pathType <- getPathType path
-    T.sequence $ expand <$> pathType
+    T.sequence $ expand extension <$> pathType
 
-expand :: PathType -> IO [FilePath]
-expand (  File path) = return [path]
-expand p@(Dir  path) = do
-    contents     <- fmap (path </>) <$> D.listDirectory path
-    contentTypes <- catMaybes <$> mapConcurrently getPathType contents
-    join <$> mapConcurrently expand contentTypes
+expand :: FilePath -> PathType -> IO [Document]
+expand extension path = go path
+  where
+    go :: PathType -> IO [Document]
+    go (File path) = if not . F.isExtensionOf extension $ path
+        then return []
+        else do
+            modAt <- getModificationTime path
+            return [Document path modAt]
+    go p@(Dir path) = do
+        contents     <- fmap (path </>) <$> D.listDirectory path
+        contentTypes <- catMaybes <$> mapConcurrently getPathType contents
+        join <$> mapConcurrently go contentTypes
 
-deepFiles :: (Traversable f, Foldable f) => f FilePath -> IO [FilePath]
-deepFiles files = join . catMaybes . toList <$> T.mapM traverseDir files
+deepFiles
+    :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [Document]
+deepFiles extension sourcePath = join . catMaybes . toList <$> T.forM
+    sourcePath
+    (\file -> do
+        result <- traverseDir extension file
+        let relativized = fmap (relativizeDocument file) <$> result
+        return relativized
+    )
 
-retrieveFiles
-    :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [FilePath]
-retrieveFiles defaultExt paths = do
-    files <- fmap normalise <$> deepFiles paths
-    return $ P.filter (F.isExtensionOf defaultExt) files
+-- | TODO: probably need to only accept a single library dir instead of multiple
+-- | or we could run into filepath collisions.
+relativizeDocument :: FilePath -> Document -> Document
+relativizeDocument baseDir doc@Document { filePath } =
+    doc { filePath = makeRelative baseDir filePath }
 
