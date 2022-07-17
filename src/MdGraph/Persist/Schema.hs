@@ -22,6 +22,7 @@ import           Control.Monad.IO.Class         ( MonadIO
                                                 )
 import           Data.Time.Clock
 import           Database.Persist
+import           Database.Persist.Quasi
 import           Database.Persist.Sqlite
 import           Database.Persist.TH
 
@@ -36,30 +37,32 @@ import           Database.Persist.TH
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Document
     path String
+    Primary path
+
     modifiedAt UTCTime
 
-    Primary path
     deriving Show
 
 TempDocument
     path String
+    Primary path
+
     modifiedAt UTCTime
 
-    Primary path
     deriving Show
 
 Tag
     name String
-    file DocumentId
+    file DocumentId OnDeleteCascade OnUpdateCascade
 
     deriving Show
 
 Edge
-    tail DocumentId
+    tail DocumentId OnDeleteCascade OnUpdateCascade
     head String
-
     Primary tail head
     UniqueEdge tail head
+
     deriving Show
 |]
 
