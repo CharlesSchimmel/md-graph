@@ -43,31 +43,42 @@ import           Prelude                       as P
 main :: IO ()
 main = do
     Arguments {..} <- opts
-    -- find documents
-    logInfo "finding documents"
-    docs <- findDocuments argDefExt [argLibrary]
-    let numDocs = P.length docs
-    logInfo . T.unwords $ ["Found", T.pack . show $ numDocs, "documents"]
 
-    logDebug "Migrating database"
+    logDebug "Preparing database"
     migrateMdGraph argDatabase
 
+    -- find documents
+    logDebug "Finding documents"
+    docs <- findDocuments argDefExt [argLibrary]
+    logInfo
+        . T.unwords
+        $ ["Found", T.pack . show . P.length $ docs, "documents"]
+
     -- load documents into temp
-    logDebug "Populating temp table"
+    logDebug "Populating TempDocuments"
     insertTempDocuments argDatabase $ Mapper.fromFile <$> docs
 
-    logDebug "Populating temp table"
+    logDebug "Pruning deleted Documents"
     pruneDeletedDocuments argDatabase
+
+    logDebug "Pruning unchanged TempDocuments"
     pruneUnchangedTempDocs argDatabase
+
+    logDebug "Pruning modified Documents"
     pruneModifiedDocs argDatabase
 
     -- find new (including "new" meaning modified)
+    logDebug "Finding new and modified TempDocuments"
     newTempDocs <- newFiles argDatabase
     let docsToInsert = fromTempDocument . entityVal <$> newTempDocs
 
+    logDebug "Inserting new and modified Documents"
     newDocs <- insertDocuments argDatabase docsToInsert
+
     let docKeyMap   = M.flop documentPath newDocs
         docsToParse = M.keys docKeyMap
+
+    logDebug "Parsing new and modified document"
     -- TODO: Need to fix link targets, missing extensions
     parseResults <-
         catMaybes
@@ -89,7 +100,10 @@ main = do
             newTagsAndEdges
 
     -- P.print newEdges
+    logDebug "Inserting new edges"
     insertEdges argDatabase newEdges
+
+    logDebug "Inserting new tags"
     insertTags argDatabase newTags
 
     P.putStrLn "Quack"

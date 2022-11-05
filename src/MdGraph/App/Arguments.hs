@@ -25,9 +25,9 @@ import           System.FilePath               as F
 data Arguments = Arguments
     { argLibrary  :: FilePath
     , argDefExt   :: FilePath
-    , argCommand  :: Command
     , argDatabase :: Text
     , argLogLevel :: LogLevel
+    , argCommand  :: Command
     }
     deriving Show
 
@@ -71,9 +71,9 @@ parseArguments =
     Arguments
         <$> parseLibrary
         <*> parseDefaultExt
-        <*> parseCommand
         <*> parseDatabase
         <*> parseLogLevel
+        <*> parseCommand
 
 parseDatabase :: Parser Text
 parseDatabase = T.pack <$> strOption
@@ -97,7 +97,7 @@ parseLibrary = strOption
 parseDefaultExt :: Parser FilePath
 parseDefaultExt = P.dropWhile (== '.') <$> strOption
     (  long "default-ext"
-    <> short 'd'
+    <> short 'x'
     <> help "Default extension to use for files linked without extension"
     <> showDefault
     <> value "md"
@@ -180,6 +180,8 @@ parseLogLevel =
     option readVerbosity
         $  long "verbosity"
         <> help "Modify the logging level"
+        <> short 'v'
+        <> metavar "DEBUG|INFO|ERROR"
         <> value Error
         <> showDefault
   where
