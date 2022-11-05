@@ -6,6 +6,7 @@ module MdGraph.App.Arguments
     ) where
 
 import           MdGraph.App.Command
+import           MdGraph.App.LogLevel          as LogLevel
 import           MdGraph.File
 import           MdGraph.Node
 import           MdGraph.TagDirection          as TagDirection
@@ -21,12 +22,12 @@ import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
-
 data Arguments = Arguments
     { argLibrary  :: FilePath
     , argDefExt   :: FilePath
     , argCommand  :: Command
     , argDatabase :: Text
+    , argLogLevel :: LogLevel
     }
     deriving Show
 
@@ -72,6 +73,7 @@ parseArguments =
         <*> parseDefaultExt
         <*> parseCommand
         <*> parseDatabase
+        <*> parseLogLevel
 
 parseDatabase :: Parser Text
 parseDatabase = T.pack <$> strOption
@@ -165,11 +167,26 @@ parseTagDirection =
         <> value TagDirection.Out
         <> showDefault
         <> metavar "In|Out|Both"
+  where
+    readTagDirection :: ReadM TagDirection
+    readTagDirection = maybeReader . asLower $ \case
+        "in"   -> Just TagDirection.In
+        "out"  -> Just TagDirection.Out
+        "both" -> Just TagDirection.Both
+        _      -> Nothing
 
-readTagDirection :: ReadM TagDirection
-readTagDirection = maybeReader . asLower $ \case
-    "in"   -> Just TagDirection.In
-    "out"  -> Just TagDirection.Out
-    "both" -> Just TagDirection.Both
-    _      -> Nothing
+parseLogLevel :: Parser LogLevel.LogLevel
+parseLogLevel =
+    option readVerbosity
+        $  long "verbosity"
+        <> help "Modify the logging level"
+        <> value Error
+        <> showDefault
+  where
+    readVerbosity :: ReadM LogLevel
+    readVerbosity = maybeReader . asLower $ \case
+        "debug" -> Just LogLevel.Debug
+        "info"  -> Just LogLevel.Info
+        "error" -> Just LogLevel.Error
+        _       -> Nothing
 

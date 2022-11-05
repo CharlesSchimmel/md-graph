@@ -9,14 +9,24 @@ import           Control.Monad.Reader           ( MonadReader
                                                 , ReaderT
                                                 , asks
                                                 )
-import           Data.Text
+import qualified Data.Text                     as T
+                                                ( Text(..)
+                                                , pack
+                                                , unwords
+                                                )
+import           Data.Text.IO                  as Tio
+import           MdGraph.App.LogLevel
 
 newtype App a = App
-  { runApp :: ReaderT Env (ExceptT Text IO) a
-  } deriving (Monad, Functor, Applicative, MonadReader Env, MonadIO, MonadError Text)
+  { runApp :: ReaderT Env (ExceptT T.Text IO) a
+  } deriving (Monad, Functor, Applicative, MonadReader Env, MonadIO, MonadError T.Text)
 
 data Env = Env
-    { config :: Config
-    }
+  { config :: Config
+  }
+  deriving Show
 
 data Config = Config
+  { logLevel :: LogLevel
+  }
+  deriving Show
