@@ -29,8 +29,7 @@ data ParseResult = ParseResult
     }
     deriving Show
 
--- TODO: mapConcurrently should be used by consumer of these functions
-
+-- TODO: Pull out absolute path
 parseDocument :: FilePath -> FilePath -> FilePath -> IO (Maybe ParseResult)
 parseDocument defExt libraryPath file = do
     exists <- doesFileExist absFile

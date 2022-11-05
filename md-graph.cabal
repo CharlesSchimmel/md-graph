@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7d14fd2397cbf5f74fbf5399ab42606e4535f7a907dd1026ebcd59d885568aea
+-- hash: 0eef8506a1edf3a6f5c85cda900c8556e4cb808242e56a6e19554839caa7a70d
 
 name:           md-graph
 version:        0.1.0.0
@@ -31,6 +31,7 @@ library
       Aux.HashSet
       Aux.Map
       Aux.Tuple
+      MdGraph
       MdGraph.App
       MdGraph.App.Arguments
       MdGraph.App.Command
@@ -39,6 +40,7 @@ library
       MdGraph.Parse
       MdGraph.Parse.Pandoc
       MdGraph.Persist
+      MdGraph.Persist.Graph
       MdGraph.Persist.Mapper
       MdGraph.Persist.Schema
       MdGraph.TagDirection

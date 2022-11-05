@@ -104,5 +104,3 @@ pruneModifiedDocs connString = runSqlite connString $ delete $ do
                                 )
             pure $ doc ^. DocumentPath
         )
-
--- copyNewDocs connString = runSqlite connString $ insertEntityMany

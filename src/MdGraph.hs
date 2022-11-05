@@ -1,4 +1,4 @@
-module Main where
+module MdGraph where
 
 import           Aux.Map                       as M
 import           MdGraph.App.Arguments
@@ -36,11 +36,10 @@ import           Prelude                       as P
                                                 , putStrLn
                                                 )
 
-main :: IO ()
-main = do
-    Arguments {..} <- opts
+prepareDatabase :: Arguments -> IO ()
+prepareDatabase Arguments {..} = do
     -- find documents
-    docs           <- findDocuments argDefExt [argLibrary]
+    docs <- findDocuments argDefExt [argLibrary]
     migrateMdGraph argDatabase
     -- load documents into temp
     insertTempDocuments argDatabase $ Mapper.fromFile <$> docs
@@ -56,7 +55,6 @@ main = do
     newDocs <- insertDocuments argDatabase docsToInsert
     let docKeyMap   = M.flop documentPath newDocs
         docsToParse = M.keys docKeyMap
-    -- TODO: Need to fix link targets, missing extensions
     parseResults <-
         catMaybes
             <$> mapConcurrently (parseDocument argDefExt argLibrary) docsToParse
