@@ -1,3 +1,5 @@
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE RankNTypes #-}
 
 module MdGraph.App where
 
@@ -15,7 +17,12 @@ import qualified Data.Text                     as T
                                                 , unwords
                                                 )
 import           Data.Text.IO                  as Tio
+import           Database.Persist.SqlBackend    ( SqlBackend )
+
+import           Control.Monad.Trans.Resource   ( MonadUnliftIO(..) )
 import           MdGraph.App.LogLevel
+import           MdGraph.Persist
+
 
 newtype App a = App
   { runApp :: ReaderT Env (ExceptT T.Text IO) a
@@ -24,9 +31,11 @@ newtype App a = App
 data Env = Env
   { config :: Config
   }
-  deriving Show
 
 data Config = Config
-  { logLevel :: LogLevel
+  { logLevel         :: LogLevel
+  , defaultExtension :: FilePath
+  , libraryPath      :: FilePath
+  , dbConnString     :: T.Text
   }
   deriving Show

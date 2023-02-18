@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d4974268daeebec8f18da487f2735a56250d6bf027eedd8bdbfec28c1588f4b2
+-- hash: 4c7d0006e62f475a2f12ef8769566bc33a1bc2675db388002510258003b5f473
 
 name:           md-graph
 version:        0.1.0.0
@@ -62,6 +62,7 @@ library
     , filepath
     , hashable
     , hashable-time
+    , monad-logger
     , mtl
     , network-uri
     , optparse-applicative
@@ -70,6 +71,7 @@ library
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
     , text
     , time
     , transformers
@@ -96,6 +98,7 @@ executable md-graph
     , hashable
     , hashable-time
     , md-graph
+    , monad-logger
     , mtl
     , network-uri
     , optparse-applicative
@@ -104,6 +107,7 @@ executable md-graph
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
     , text
     , time
     , transformers
@@ -131,6 +135,7 @@ test-suite md-graph-test
     , hashable
     , hashable-time
     , md-graph
+    , monad-logger
     , mtl
     , network-uri
     , optparse-applicative
@@ -139,6 +144,7 @@ test-suite md-graph-test
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
     , text
     , time
     , transformers

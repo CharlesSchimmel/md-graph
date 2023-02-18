@@ -1,12 +1,20 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-#  LANGUAGE TypeApplications  #-}
+{-#  LANGUAGE RankNTypes  #-}
 
 module MdGraph.Persist where
 
 import           MdGraph.Persist.Schema
 
 import           Control.Monad                  ( mapM )
+import           Control.Monad.Logger           ( NoLoggingT(..) )
+import           Control.Monad.Reader           ( MonadIO(liftIO)
+                                                , MonadReader(ask)
+                                                , ReaderT
+                                                , local
+                                                )
 import qualified Data.Map.Strict               as M
 import           Data.Text                      ( Text(..) )
 import           Database.Esqueleto.Experimental
@@ -15,26 +23,30 @@ import           Database.Persist               ( Filter(..)
                                                 , insertMany
                                                 )
 import           Database.Persist.Sqlite        ( runSqlite )
+import           UnliftIO.Resource              ( ResourceT(..) )
 
-insertEdges :: Text -> [Edge] -> IO [Key Edge]
-insertEdges connString edges = runSqlite connString $ insertMany edges
+insertEdges :: MonadIO m => Text -> [Edge] -> m [Key Edge]
+insertEdges connString edges = liftIO . runSqlite connString $ insertMany edges
 
-insertTags :: Text -> [Tag] -> IO [Key Tag]
-insertTags connString tags = runSqlite connString $ insertMany tags
+insertTags :: MonadIO m => Text -> [Tag] -> m [Key Tag]
+insertTags connString tags = liftIO . runSqlite connString $ insertMany tags
 
-insertDocuments :: Text -> [Document] -> IO (M.Map (Key Document) Document)
-insertDocuments connString docs = runSqlite connString $ do
+insertDocuments
+    :: MonadIO m => Text -> [Document] -> m (M.Map (Key Document) Document)
+insertDocuments connString docs = liftIO . runSqlite connString $ do
     keys <- insertMany docs
     getMany keys
 
-insertTempDocuments :: Text -> [TempDocument] -> IO [Key TempDocument]
-insertTempDocuments connString docs = runSqlite connString $ do
+insertTempDocuments
+    :: MonadIO m => Text -> [TempDocument] -> m [Key TempDocument]
+insertTempDocuments connString docs = liftIO . runSqlite connString $ do
     deleteWhere ([] :: [Filter TempDocument])
     insertMany docs
 
 -- | Find items in Temp not in Doc
-modifiedFiles :: Text -> IO [(Entity Document, Entity TempDocument)]
-modifiedFiles connString = runSqlite connString $ select $ do
+modifiedFiles
+    :: MonadIO m => Text -> m [(Entity Document, Entity TempDocument)]
+modifiedFiles connString = liftIO . runSqlite connString $ select $ do
     (file :& tempFile) <-
         from $ table @Document `InnerJoin` table @TempDocument `on` do
             \(file :& tempFile) ->
@@ -45,8 +57,8 @@ modifiedFiles connString = runSqlite connString $ select $ do
     pure (file, tempFile)
 
 -- | Find items in Temp not in Doc
-newFiles :: Text -> IO [Entity TempDocument]
-newFiles connString = runSqlite connString $ select $ do
+newFiles :: MonadIO m => Text -> m [Entity TempDocument]
+newFiles connString = liftIO . runSqlite connString $ select $ do
     (tempFile :& file) <-
         from
         $          table @TempDocument
@@ -56,40 +68,52 @@ newFiles connString = runSqlite connString $ select $ do
     where_ $ isNothing (file ?. DocumentPath)
     pure tempFile
 
--- | Must be called after pruneDeletedDocuments!
--- | Delete TempDocs that have not been modified
-pruneUnchangedTempDocs connString = runSqlite connString $ delete $ do
-    tempDoc <- from $ table @TempDocument
-    where_ $ tempDoc ^. TempDocumentPath `in_` subSelectList
-        (do
-            (doc :& tempDoc) <-
-                from $ table @Document `InnerJoin` table @TempDocument `on` do
-                    \(doc :& tempDoc) ->
-                        (doc ^. DocumentPath ==. tempDoc ^. TempDocumentPath)
-                            &&. (   doc
-                                ^.  DocumentModifiedAt
-                                ==. tempDoc
-                                ^.  TempDocumentModifiedAt
-                                )
-            pure $ doc ^. DocumentPath
-        )
+-- | Must be called after pruneDeletedDocuments! Delete TempDocs that have not
+-- been modified
+pruneUnchangedTempDocs connString =
+    liftIO . runSqlite connString $ deleteCount $ do
+        tempDoc <- from $ table @TempDocument
+        where_ $ tempDoc ^. TempDocumentPath `in_` subSelectList
+            (do
+                (doc :& tempDoc) <-
+                    from
+                    $           table @Document
+                    `InnerJoin` table @TempDocument
+                    `on`        do
+                                    \(doc :& tempDoc) ->
+                                        (   doc
+                                            ^.  DocumentPath
+                                            ==. tempDoc
+                                            ^.  TempDocumentPath
+                                            )
+                                            &&. (   doc
+                                                ^.  DocumentModifiedAt
+                                                ==. tempDoc
+                                                ^.  TempDocumentModifiedAt
+                                                )
+                pure $ doc ^. DocumentPath
+            )
 
 -- | Must be called before pruneUnchangedTempDocs!
--- | Delete Docmuments not found in most recent scan
--- | This should cascade to a document's Tags and Edges
-pruneDeletedDocuments connString = runSqlite connString $ delete $ do
-    file <- from $ table @Document
+-- Delete Docmuments not found in most recent scan This should cascade to a
+-- document's Tags and Edges
+pruneDeletedDocuments connString =
+    liftIO . runSqlite connString . deleteCount $ do
+        file <- from $ table @Document
+        whereDocumentDeleted file
+
+-- | Documents that are not in TempDocuments
+whereDocumentDeleted file = do
     where_ $ file ^. DocumentPath `notIn` subSelectList
         (do
             tf <- from $ table @TempDocument
             pure $ tf ^. TempDocumentPath
         )
 
--- | Delete Docs where the TempDoc counterpart has a newer Modified
--- | So that they can be find when newDocs is run (we will have to delete them
--- | anyway)
-pruneModifiedDocs :: Text -> IO ()
-pruneModifiedDocs connString = runSqlite connString $ delete $ do
+-- | Delete modified Documents (ie the TempDoc counterpart has a newer
+-- Modified) so that they can be found when newDocs is run (we will have to
+-- delete them anyway)
+pruneModifiedDocs connString = liftIO . runSqlite connString $ deleteCount $ do
     file <- from $ table @Document
     where_ $ file ^. DocumentPath `in_` subSelectList
         (do
@@ -104,3 +128,4 @@ pruneModifiedDocs connString = runSqlite connString $ delete $ do
                                 )
             pure $ doc ^. DocumentPath
         )
+

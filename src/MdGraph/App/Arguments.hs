@@ -2,7 +2,7 @@
 
 module MdGraph.App.Arguments
     ( Arguments(..)
-    , opts
+    , cliArguments
     ) where
 
 import           MdGraph.App.Command
@@ -27,9 +27,26 @@ data Arguments = Arguments
     , argDefExt   :: FilePath
     , argDatabase :: Text
     , argLogLevel :: LogLevel
-    , argCommand  :: Command
+    , argCommand  :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
     }
     deriving Show
+
+cliArguments :: IO Arguments
+cliArguments =
+    customExecParser (prefs disambiguate)
+        $  info (helper <*> parseArguments)
+        $  fullDesc
+        <> header
+               "md-graph - A utility for graph operations on a collection of markdown files"
+
+parseArguments :: Parser Arguments
+parseArguments =
+    Arguments
+        <$> parseLibrary
+        <*> parseDefaultExt
+        <*> parseDatabase
+        <*> parseLogLevel
+        <*> parseCommand
 
 parseCommand :: Parser Command
 parseCommand = hsubparser
@@ -57,23 +74,6 @@ parseCommand = hsubparser
            $ progDesc "Links that can be resolved but are not notes"
            )
     )
-
-opts :: IO Arguments
-opts =
-    customExecParser (prefs disambiguate)
-        $  info (helper <*> parseArguments)
-        $  fullDesc
-        <> header
-               "md-graph - A utility for graph operations on a collection of markdown files"
-
-parseArguments :: Parser Arguments
-parseArguments =
-    Arguments
-        <$> parseLibrary
-        <*> parseDefaultExt
-        <*> parseDatabase
-        <*> parseLogLevel
-        <*> parseCommand
 
 parseDatabase :: Parser Text
 parseDatabase = T.pack <$> strOption

@@ -2,26 +2,53 @@ module MdGraph.File
     ( fixLink
     , findDocuments
     , File(..)
+    , FindsDocuments(..)
     ) where
 
 import           Control.Applicative
 import           Control.Concurrent.Async       ( mapConcurrently )
 import           Control.Monad                  ( join )
+import           Control.Monad.IO.Class         ( liftIO )
+import           Control.Monad.Reader           ( asks )
 import           Control.Monad.Trans.Maybe
 import           Data.Foldable
 import           Data.Hashable                  ( Hashable )
 import           Data.Maybe
+import           Data.Text                     as T
+                                                ( pack
+                                                , unwords
+                                                )
 import           Data.Time                      ( UTCTime )
 import           Data.Traversable              as T
+import           MdGraph.App                    ( App
+                                                , Config(..)
+                                                , Env(config)
+                                                )
+import           MdGraph.App.Logger             ( logDebug
+                                                , logInfo
+                                                )
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
 data File = File
-    { filePath         :: FilePath
+    { filePath         :: FilePath -- | Relative to the library
     , modificationTime :: UTCTime
     }
     deriving (Show, Ord, Eq)
+
+class FindsDocuments m where
+  findDocumentsM :: m [File]
+
+instance FindsDocuments App where
+    findDocumentsM = do
+        logDebug "Finding documents"
+        Config {..} <- asks config
+        docs        <- liftIO $ findDocuments defaultExtension [libraryPath]
+        logInfo
+            . T.unwords
+            $ ["Found", T.pack . show . P.length $ docs, "documents"]
+        return docs
 
 doubleDot :: FilePath
 doubleDot = ".."
@@ -75,6 +102,8 @@ maybeFile file = do
     exists <- D.doesFileExist file
     pure $ if exists then Just file else Nothing
 
+-- | Find documents in library and return them with FilePaths relative to the
+-- library
 findDocuments
     :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [File]
 findDocuments defaultExt sourcePaths = do
@@ -121,8 +150,9 @@ deepFiles extension sourcePath = join . catMaybes . toList <$> T.forM
         return relativized
     )
 
--- | TODO: probably need to only accept a single library dir instead of multiple
--- | or we could run into filepath collisions.
+-- TODO: probably need to only accept a single library dir instead of multiple
+-- or we could run into filepath collisions.
+
 relativizeDocument :: FilePath -> File -> File
 relativizeDocument baseDir doc@File { filePath } =
     doc { filePath = makeRelative baseDir filePath }

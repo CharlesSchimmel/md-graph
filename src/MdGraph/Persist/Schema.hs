@@ -67,4 +67,7 @@ Edge
     deriving Show
 |]
 
-migrateMdGraph dbFile = runSqlite dbFile $ runMigration migrateAll
+migrateMdGraph connString =
+    liftIO . runSqlite connString $ runMigration migrateAll
+
+migrateMdGraph' sqlConn = sqlConn $ runMigration migrateAll
