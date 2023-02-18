@@ -1,6 +1,7 @@
 module Main where
 
 import           Aux.Map                       as M
+import Aux.Common
 import MdGraph
 import           MdGraph.App.Arguments
 import           MdGraph.App.Logger
@@ -17,6 +18,7 @@ import           MdGraph.Persist.Schema         ( Document(documentPath)
                                                 , migrateMdGraph
                                                 )
 import           MdGraph.App
+import           MdGraph.Config
 
 import           Control.Concurrent.Async       ( mapConcurrently )
 import           Control.Monad                  ( forM
@@ -47,8 +49,12 @@ import           Prelude                       as P
 
 main :: IO ()
 main = do
-    Arguments {..} <- cliArguments
-    let conf = Config argLogLevel argDefExt argLibrary argDatabase
-    let env = Env conf
-    out <- runExceptT (runReaderT (runApp prepareDatabase) env)
-    either T.putStrLn (const $ pure ()) out
+    args <- cliArguments
+    conf <- runExceptT $ argsToConfig args
+    print conf
+    -- TODO: Better error handling here
+    forEither conf (T.putStrLn)
+        $ \conf -> do
+           let env = Env conf
+           out <- runExceptT (runReaderT (runApp prepareDatabase) env)
+           either T.putStrLn (const $ pure ()) out

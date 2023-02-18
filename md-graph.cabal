@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4c7d0006e62f475a2f12ef8769566bc33a1bc2675db388002510258003b5f473
+-- hash: 2a91fab99c8a41409d51addbd7657f9f222ea44855b7e62402cc6b7bd853bd7f
 
 name:           md-graph
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      Aux.Common
       Aux.HashMap
       Aux.HashSet
       Aux.Map
@@ -37,6 +38,7 @@ library
       MdGraph.App.Command
       MdGraph.App.Logger
       MdGraph.App.LogLevel
+      MdGraph.Config
       MdGraph.File
       MdGraph.Node
       MdGraph.Parse
@@ -44,6 +46,7 @@ library
       MdGraph.Persist
       MdGraph.Persist.Graph
       MdGraph.Persist.Mapper
+      MdGraph.Persist.Query
       MdGraph.Persist.Schema
       MdGraph.TagDirection
   other-modules:
@@ -75,6 +78,7 @@ library
     , text
     , time
     , transformers
+    , unix
     , unordered-containers
   default-language: Haskell2010
 
@@ -111,6 +115,7 @@ executable md-graph
     , text
     , time
     , transformers
+    , unix
     , unordered-containers
   default-language: Haskell2010
 
@@ -148,5 +153,6 @@ test-suite md-graph-test
     , text
     , time
     , transformers
+    , unix
     , unordered-containers
   default-language: Haskell2010

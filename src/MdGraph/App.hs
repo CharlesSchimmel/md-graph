@@ -20,8 +20,7 @@ import           Data.Text.IO                  as Tio
 import           Database.Persist.SqlBackend    ( SqlBackend )
 
 import           Control.Monad.Trans.Resource   ( MonadUnliftIO(..) )
-import           MdGraph.App.LogLevel
-import           MdGraph.Persist
+import           MdGraph.Config
 
 
 newtype App a = App
@@ -31,11 +30,3 @@ newtype App a = App
 data Env = Env
   { config :: Config
   }
-
-data Config = Config
-  { logLevel         :: LogLevel
-  , defaultExtension :: FilePath
-  , libraryPath      :: FilePath
-  , dbConnString     :: T.Text
-  }
-  deriving Show

@@ -1,13 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE StrictData #-}
 
 module MdGraph.App.Arguments
     ( Arguments(..)
+    , DatabaseArg(..)
     , cliArguments
     ) where
 
 import           MdGraph.App.Command
 import           MdGraph.App.LogLevel          as LogLevel
-import           MdGraph.File
 import           MdGraph.Node
 import           MdGraph.TagDirection          as TagDirection
 
@@ -22,10 +23,14 @@ import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
+
+data DatabaseArg = Temp | DbFile { dbFile :: Text }
+    deriving Show
+
 data Arguments = Arguments
     { argLibrary  :: FilePath
     , argDefExt   :: FilePath
-    , argDatabase :: Text
+    , argDatabase :: DatabaseArg
     , argLogLevel :: LogLevel
     , argCommand  :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
     }
@@ -75,14 +80,19 @@ parseCommand = hsubparser
            )
     )
 
-parseDatabase :: Parser Text
-parseDatabase = T.pack <$> strOption
-    (  long "database"
-    <> short 'd'
-    <> help "Sqlite database to be used"
-    <> metavar "DB"
-    <> value ":memory:"
+parseDatabase :: Parser DatabaseArg
+parseDatabase = parseToDbArg <$> optional
+    (strOption
+        (  long "database"
+        <> short 'd'
+        <> help "Sqlite database to be used"
+        <> metavar "DB"
+        )
     )
+  where
+    parseToDbArg :: Maybe String -> DatabaseArg
+    parseToDbArg = maybe Temp (DbFile . T.pack)
+
 
 parseLibrary :: Parser FilePath
 parseLibrary = strOption

@@ -9,10 +9,10 @@ import           Prelude                 hiding ( log )
 
 import           Control.Monad.Reader           ( asks )
 import           MdGraph.App                    ( App(..)
-                                                , Config(..)
                                                 , Env(..)
                                                 )
 import           MdGraph.App.LogLevel
+import           MdGraph.Config
 
 class Logs m where
   log :: LogLevel -> T.Text -> m ()

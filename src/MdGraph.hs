@@ -4,14 +4,15 @@ import           Aux.Map                       as M
 import           MdGraph.App
 import           MdGraph.App.Arguments
 import           MdGraph.App.Logger
+import           MdGraph.Config
 import           MdGraph.File                   ( FindsDocuments(findDocumentsM)
                                                 , findDocuments
                                                 )
 import           MdGraph.Parse                  ( ParseResult(..)
                                                 , parseDocument
                                                 )
-import           MdGraph.Persist
 import           MdGraph.Persist.Mapper        as Mapper
+import           MdGraph.Persist.Query
 import           MdGraph.Persist.Schema         ( Document(documentPath)
                                                 , Edge(..)
                                                 , Tag(..)
@@ -52,6 +53,10 @@ import           Prelude                       as P
 import           System.FilePath                ( (</>) )
 
 trace' x = trace (show x) x
+
+mdGraph :: App ()
+mdGraph = do
+    prepareDatabase
 
 prepareDatabase :: App ()
 prepareDatabase = do

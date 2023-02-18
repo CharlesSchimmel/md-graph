@@ -2,8 +2,6 @@
 
 module MdGraph.Node where
 
-import           MdGraph.File                   ( fixLink )
-
 import           Data.Hashable
 import           Data.Text                     as T
 import           Data.Time                      ( UTCTime )

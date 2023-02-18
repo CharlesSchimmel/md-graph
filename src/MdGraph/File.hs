@@ -21,12 +21,12 @@ import           Data.Text                     as T
 import           Data.Time                      ( UTCTime )
 import           Data.Traversable              as T
 import           MdGraph.App                    ( App
-                                                , Config(..)
                                                 , Env(config)
                                                 )
 import           MdGraph.App.Logger             ( logDebug
                                                 , logInfo
                                                 )
+import           MdGraph.Config
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
