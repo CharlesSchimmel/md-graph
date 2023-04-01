@@ -129,3 +129,22 @@ pruneModifiedDocs connString = liftIO . runSqlite connString $ deleteCount $ do
             pure $ doc ^. DocumentPath
         )
 
+-- Files with no edges to or from
+orphans connString = liftIO . runSqlite connString $ select $ do
+    from
+        $         from (table @Document)
+        `except_` filesThatHaveLinks
+        `except_` filesThatAreLinkedTo
+
+filesThatAreLinkedTo = do
+    (file :& edge) <- from $ table @Document `InnerJoin` table @Edge `on` do
+        \(doc :& edge) -> doc ^. DocumentPath ==. edge ^. EdgeHead
+    pure file
+
+filesThatHaveLinks = do
+    (file :& edge) <- from $ table @Document `InnerJoin` table @Edge `on` do
+        \(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail
+    pure file
+
+-- Files with no edges to
+stranded = undefined

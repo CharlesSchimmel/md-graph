@@ -37,10 +37,13 @@ import           Data.HashSet                  as S
 import qualified Data.Map.Strict               as M
 import           Data.Maybe                     ( catMaybes )
 import qualified Data.Text                     as T
+import qualified Data.Text.IO                  as T
 import           Database.Persist.Sqlite        ( Entity(entityVal)
                                                 , runSqlite
                                                 )
 import           Debug.Trace                    ( trace )
+import           MdGraph.App.Command            ( Command )
+import           MdGraph.App.RunCommand         ( runCommand )
 import           Options.Applicative
 import           Prelude
 import           Prelude                       as P
@@ -54,9 +57,13 @@ import           System.FilePath                ( (</>) )
 
 trace' x = trace (show x) x
 
-mdGraph :: App ()
-mdGraph = do
+mdGraph :: Command -> App ()
+mdGraph command = do
     prepareDatabase
+    logDebug . T.pack $ show command
+    documents <- runCommand command
+    let docPaths = documentPath <$> documents
+    liftIO $ F.mapM_ putStrLn docPaths
 
 prepareDatabase :: App ()
 prepareDatabase = do
@@ -107,7 +114,7 @@ prepareDatabase = do
         <$> mapConcurrently (parseDocument defaultExtension libraryPath)
                             docPathsToParse
     -- TODO: Why are parse results not working?
-    liftIO $ P.print parseResults
+    -- liftIO $ P.print parseResults
     let resultMap = M.fromList' file parseResults
         pathToKeyResult =
             P.map snd . M.toList $ M.unionWith' docKeyMap resultMap

@@ -33,37 +33,3 @@ data BacklinkOptions = BacklinkOptions
     , blDepth   :: Integer
     }
     deriving Show
-
--- runCommand
---     :: Command -> [(Node, Node)] -> HashSet FilePath -> IO (HashSet Node)
-
--- runCommand Orphans nodes allFiles = return $ orphans fwdMap bwdMap allFiles
---     where (fwdMap, bwdMap) = buildMaps nodes
-
--- runCommand Unreachable nodes allFiles = return $ stranded fwdMap bwdMap
---     where (fwdMap, bwdMap) = buildMaps nodes
-
--- runCommand Nonexes nodes allFiles = do
---     let (fwdMap, bwdMap) = buildMaps nodes
---     results <- weirdos $ Corpus fwdMap bwdMap allFiles
---     return $ nonex results
-
--- runCommand Statics nodes allFiles = do
---     let (fwdMap, bwdMap) = buildMaps nodes
---     results <- weirdos $ Corpus fwdMap bwdMap allFiles
---     return $ statix results
-
--- runCommand (Subgraph (SubgraphOptions targets incNonex incStatic tagDir depth)) nodes allFiles
---     = do
---         (Weirdos statix nonex) <- weirdos $ Corpus fwdGraph bwdGraph allFiles
---         return . withNonex nonex . withStatic statix $ subgraph depth
---                                                                 fwdGraph
---                                                                 targets
---   where
---     (fwdGraph, bwdGraph) = buildMaps $ adjustTagDir tagDir nodes
---     withNonex            = if incNonex then const id else flip S.difference
---     withStatic           = if incStatic then const id else flip S.difference
-
--- runCommand (Backlinks (BacklinkOptions targets depth)) nodes allFiles =
---     return $ subgraph depth bwdGraph targets
---     where (fwdGraph, bwdGraph) = buildMaps nodes

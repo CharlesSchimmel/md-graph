@@ -49,12 +49,12 @@ import           Prelude                       as P
 
 main :: IO ()
 main = do
-    args <- cliArguments
+    args@Arguments{..} <- cliArguments
     conf <- runExceptT $ argsToConfig args
     print conf
     -- TODO: Better error handling here
     forEither conf (T.putStrLn)
         $ \conf -> do
            let env = Env conf
-           out <- runExceptT (runReaderT (runApp prepareDatabase) env)
+           out <- runExceptT (runReaderT (runApp $ mdGraph argCommand) env)
            either T.putStrLn (const $ pure ()) out
