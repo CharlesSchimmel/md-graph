@@ -3,7 +3,7 @@
 Graph operations on a collection of interlinked Markdown (or 
 [VimWiki](https://github.com/vimwiki/vimwiki), [ZimWiki](https://zim-wiki.org/), 
 [Zettlr](https://www.zettlr.com/), [Obsidian](https://obsidian.md/), or 
-[Neuron](https://obsidian.md/)) notes.
+[Neuron](https://neuron.zettel.page/)) notes.
 
 md-graph seeks to enrich an existing library of interlinked notes but not change 
 how notes are written for the sake of its use. This enables interoperation with 
