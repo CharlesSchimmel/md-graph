@@ -19,7 +19,6 @@ import           MdGraph.Persist.Schema         ( Document(documentPath)
                                                 , TempDocument(tempDocumentPath)
                                                 , migrateAll
                                                 , migrateMdGraph
-                                                , migrateMdGraph'
                                                 )
 
 import           Control.Concurrent.Async       ( mapConcurrently )
@@ -50,20 +49,22 @@ import           Prelude                       as P
                                                 ( foldr
                                                 , length
                                                 , map
+                                                , mapM
                                                 , print
                                                 , putStrLn
                                                 )
 import           System.FilePath                ( (</>) )
 
-trace' x = trace (show x) x
-
 mdGraph :: Command -> App ()
 mdGraph command = do
     prepareDatabase
     logDebug . T.pack $ show command
-    documents <- runCommand command
-    let docPaths = documentPath <$> documents
+    docPaths <- runCommand command
     liftIO $ F.mapM_ putStrLn docPaths
+
+-- prepareDatabaseFile :: App ()
+-- prepareDatabaseFile = do
+
 
 prepareDatabase :: App ()
 prepareDatabase = do
@@ -74,7 +75,7 @@ prepareDatabase = do
     -- find documents
     logDebug "Finding documents"
     docs <- liftIO $ findDocuments defaultExtension [libraryPath]
-    let totalCt = P.length (trace' docs)
+    let totalCt = P.length docs
 
     -- load all found documents into temp
     logDebug "Populating TempDocuments"
@@ -104,7 +105,7 @@ prepareDatabase = do
     newDocs <- insertDocuments dbConnString docsToInsert
 
     let docKeyMap       = M.flop documentPath newDocs
-        docPathsToParse = (libraryPath </>) <$> M.keys docKeyMap
+        docPathsToParse = M.keys docKeyMap
 
     logDebug "Parsing new and modified Documents"
     -- TODO: Need to fix link targets, missing extensions
@@ -113,8 +114,8 @@ prepareDatabase = do
         $   catMaybes
         <$> mapConcurrently (parseDocument defaultExtension libraryPath)
                             docPathsToParse
+
     -- TODO: Why are parse results not working?
-    -- liftIO $ P.print parseResults
     let resultMap = M.fromList' file parseResults
         pathToKeyResult =
             P.map snd . M.toList $ M.unionWith' docKeyMap resultMap
@@ -149,3 +150,4 @@ prepareDatabase = do
 
 reportDocumentCount num reason = do
     logInfo . T.unwords $ [T.pack . show $ num, reason]
+    pure ()

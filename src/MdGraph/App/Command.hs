@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 module MdGraph.App.Command where
 
 import           Aux.HashSet
@@ -7,11 +8,19 @@ import           Data.HashSet                  as S
 import           Data.List.NonEmpty
 
 data Command =
-    Orphans
+    -- | Just populate the db, don't return anything
+    Populate
+    -- | Find documents that don't have any forward or backward ldinks
+      | Orphans
+    -- | Find documents that don't have any backward links
       | Unreachable
+    -- | Find links that don't resolve to actual documents
       | Nonexes
+    -- | Find links that resolve to non-documents
       | Statics
+    -- | Find the links of a document and its links' links, etc
       | Subgraph SubgraphOptions
+    -- | Find the files that link to a document
       | Backlinks BacklinkOptions
       deriving Show
 

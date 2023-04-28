@@ -68,6 +68,4 @@ Edge
 |]
 
 migrateMdGraph connString =
-    liftIO . runSqlite connString $ runMigration migrateAll
-
-migrateMdGraph' sqlConn = sqlConn $ runMigration migrateAll
+    liftIO . runSqlite connString $ runMigrationQuiet migrateAll

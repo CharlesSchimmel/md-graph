@@ -4,7 +4,21 @@
 {-#  LANGUAGE TypeApplications  #-}
 {-#  LANGUAGE RankNTypes  #-}
 
-module MdGraph.Persist.Query where
+module MdGraph.Persist.Query
+    ( insertEdges
+    , insertTags
+    , insertDocuments
+    , insertTempDocuments
+    , pruneDeletedDocuments
+    , pruneUnchangedTempDocs
+    , newFiles
+    , unreachable
+    , orphans
+    , pruneModifiedDocs
+    , nonexistant
+    , forwardLinks
+    , backwardLinks
+    ) where
 
 import           MdGraph.Persist.Schema
 
@@ -152,10 +166,44 @@ filesThatHaveLinks = do
     pure file
 
 -- Files with no incoming edges (but may have outgoing 
-stranded connString =
+unreachable connString =
     liftIO
         . runSqlite connString
         $ select
         $ do
               from
         $ (filesThatHaveLinks `except_` filesThatAreLinkedTo)
+
+backwardLinks connString docPath = liftIO . runSqlite connString $ select $ do
+    (parentDoc :& edge :& childDoc) <-
+        from
+        $           table @Document
+        `innerJoin` table @Edge
+        `on`        (\(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail)
+        `innerJoin` table @Document
+        `on` (\(_ :& edge :& doc) -> doc ^. DocumentPath ==. edge ^. EdgeHead)
+    where_ (childDoc ^. DocumentPath ==. docPath)
+    pure parentDoc
+
+
+forwardLinks connString docPath = liftIO . runSqlite connString $ select $ do
+    (parentDoc :& edge :& childDoc) <-
+        from
+        $           table @Document
+        `innerJoin` table @Edge
+        `on`        (\(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail)
+        `leftJoin`  table @Document
+        `on`        (\(_ :& edge :& doc) ->
+                        just (edge ^. EdgeHead) ==. doc ?. DocumentPath
+                    )
+    where_ (parentDoc ^. DocumentPath ==. val docPath)
+    pure childDoc
+
+
+-- | Edges without associated files
+nonexistant connString = liftIO . runSqlite connString $ select $ do
+    (edge :& doc) <-
+        from $ table @Edge `leftJoin` table @Document `on` \(edge :& doc) ->
+            just (edge ^. EdgeTail) ==. doc ?. DocumentId
+    where_ $ isNothing (doc ?. DocumentPath)
+    pure edge

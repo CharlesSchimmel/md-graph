@@ -1,13 +1,16 @@
+{-# LANGUAGE  NamedFieldPuns  #-}
 module MdGraph.App.RunCommand where
 
 import           Aux.HashSet
 import           MdGraph.TagDirection
 
+import           Control.Monad                  ( join )
 import           Control.Monad.Except           ( MonadError(throwError)
                                                 , MonadIO(liftIO)
                                                 )
 import           Control.Monad.Reader           ( asks )
 import           Data.HashSet                  as S
+import           Data.Maybe                     ( catMaybes )
 import qualified Data.Text                     as T
 import           Database.Persist               ( Entity(entityVal) )
 import           MdGraph.App                    ( App
@@ -18,52 +21,56 @@ import           MdGraph.App.Logger             ( logDebug )
 import           MdGraph.Config                 ( Config(dbConnString) )
 import           MdGraph.Persist.Query         as Q
 import           MdGraph.Persist.Schema
+import qualified MdGraph.Persist.Schema        as Edge
+                                                ( Edge(..) )
 
 
 
-runCommand :: Command -> App [Document]
-runCommand Orphans = runOrphans
-runCommand _       = throwError "Not yet implemented"
+runCommand :: Command -> App [String]
+runCommand Orphans             = fmap documentPath <$> runOrphans
+runCommand Unreachable         = fmap documentPath <$> runUnreachable
+runCommand Nonexes             = fmap edgeHead <$> runNonexistant
+runCommand Statics             = throwError "NYI"
+runCommand (Subgraph  options) = runSubgraph options
+runCommand (Backlinks options) = throwError "NYI"
+runCommand Populate            = pure mempty
 
 runOrphans :: App [Document]
 runOrphans = do
-    connString <- asks $ dbConnString . config
-    orphanDocs <- Q.orphans connString
-    let orphanCount = length orphanDocs
-    logDebug $ T.unwords ["Found", T.pack . show $ orphanCount, "orphans"]
-    return $ entityVal <$> orphanDocs
+  connString <- asks $ dbConnString . config
+  orphanDocs <- Q.orphans connString
+  let orphanCount = length orphanDocs
+  logDebug $ T.unwords ["Found", T.pack . show $ orphanCount, "orphans"]
+  return $ entityVal <$> orphanDocs
 
+runUnreachable :: App [Document]
+runUnreachable = do
+  connString <- asks $ dbConnString . config
+  orphanDocs <- Q.unreachable connString
+  let orphanCount = length orphanDocs
+  logDebug $ T.unwords ["Found", T.pack . show $ orphanCount, "unreachable"]
+  return $ entityVal <$> orphanDocs
 
--- runCommand
---     :: Command -> [(Node, Node)] -> HashSet FilePath -> IO (HashSet Node)
+runNonexistant :: App [Edge]
+runNonexistant = do
+  connString <- asks $ dbConnString . config
+  nonexes    <- Q.nonexistant connString
+  let count = length nonexes
+  logDebug $ T.unwords ["Found", T.pack . show $ count, "nonexistant"]
+  return $ entityVal <$> nonexes
 
--- runCommand Orphans nodes allFiles = return $ orphans fwdMap bwdMap allFiles
---     where (fwdMap, bwdMap) = buildMaps nodes
+runSubgraph :: SubgraphOptions -> App [FilePath]
+runSubgraph options@SubgraphOptions { sgTargets } =
+  join <$> mapM runSubgraph' sgTargets
 
--- runCommand Unreachable nodes allFiles = return $ stranded fwdMap bwdMap
---     where (fwdMap, bwdMap) = buildMaps nodes
+runSubgraph' :: SubgraphTarget -> App [FilePath]
+runSubgraph' (FileTarget path) = runSubgraphPath path
+runSubgraph' _                 = throwError "NYI"
 
--- runCommand Nonexes nodes allFiles = do
---     let (fwdMap, bwdMap) = buildMaps nodes
---     results <- weirdos $ Corpus fwdMap bwdMap allFiles
---     return $ nonex results
-
--- runCommand Statics nodes allFiles = do
---     let (fwdMap, bwdMap) = buildMaps nodes
---     results <- weirdos $ Corpus fwdMap bwdMap allFiles
---     return $ statix results
-
--- runCommand (Subgraph (SubgraphOptions targets incNonex incStatic tagDir depth)) nodes allFiles
---     = do
---         (Weirdos statix nonex) <- weirdos $ Corpus fwdGraph bwdGraph allFiles
---         return . withNonex nonex . withStatic statix $ subgraph depth
---                                                                 fwdGraph
---                                                                 targets
---   where
---     (fwdGraph, bwdGraph) = buildMaps $ adjustTagDir tagDir nodes
---     withNonex            = if incNonex then const id else flip S.difference
---     withStatic           = if incStatic then const id else flip S.difference
-
--- runCommand (Backlinks (BacklinkOptions targets depth)) nodes allFiles =
---     return $ subgraph depth bwdGraph targets
---     where (fwdGraph, bwdGraph) = buildMaps nodes
+runSubgraphPath :: FilePath -> App [FilePath]
+runSubgraphPath path = do
+  connString <- asks $ dbConnString . config
+  nonexes    <- Q.forwardLinks connString path
+  let paths = documentPath . entityVal <$> catMaybes nonexes
+  recurse <- join <$> mapM runSubgraphPath paths
+  return $ path : recurse

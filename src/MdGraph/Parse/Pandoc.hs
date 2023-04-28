@@ -7,10 +7,12 @@ module MdGraph.Parse.Pandoc
 import           Control.Applicative
 import           Data.HashSet                  as S
 import           Data.Text                     as T
+import           MdGraph.App.Logger             ( trace' )
 import           MdGraph.Node
 import qualified Network.URI                   as URI
                                                 ( unEscapeString )
 import           Prelude                       as P
+import           System.FilePath                ( normalise )
 import           Text.Pandoc.Class              ( runPure )
 import           Text.Pandoc.Definition        as Pandoc
                                                 ( Block(..)
@@ -51,8 +53,9 @@ sieveLinks content = either (const Nothing) Just $ do
 
 -- TODO: does pandoc URI %20 escape markdown links?
 extractUrl :: Inline -> HashSet Link
-extractUrl (Pandoc.Link _ _ (path, title)) = S.singleton
-    $ Link (URI.unEscapeString . T.unpack $ ignoreAnchors path) title
+extractUrl (Pandoc.Link _ _ (path, title)) = S.singleton $ Link
+    (normalise . URI.unEscapeString . T.unpack $ ignoreAnchors path)
+    title
 -- if you've got anchors in your image URLs what are you doing
 extractUrl (Image _ _ (path, title)) =
     S.singleton $ Link (T.unpack $ ignoreAnchors path) title

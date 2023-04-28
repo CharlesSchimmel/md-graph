@@ -8,6 +8,7 @@ import           Data.Text.IO                  as Tio
 import           Prelude                 hiding ( log )
 
 import           Control.Monad.Reader           ( asks )
+import           Debug.Trace                    ( trace )
 import           MdGraph.App                    ( App(..)
                                                 , Env(..)
                                                 )
@@ -34,8 +35,11 @@ logInfo :: Logs m => T.Text -> m ()
 logInfo = log Info
 
 instance Logs App where
-    log printLogLevel msg = do
-        maxLogLevel <- asks $ logLevel . config
-        if printLogLevel > maxLogLevel
-            then pure ()
-            else liftIO $ log printLogLevel msg
+    log msgLogLevel msg = do
+        minLogLevel <- asks $ logLevel . config
+        if minLogLevel <= msgLogLevel
+            then liftIO $ log msgLogLevel msg
+            else pure ()
+
+trace' x = trace (show x) x
+trace'' note x = trace (note ++ " " ++ show x) x

@@ -191,7 +191,7 @@ parseLogLevel =
         $  long "verbosity"
         <> help "Modify the logging level"
         <> short 'v'
-        <> metavar "DEBUG|INFO|ERROR"
+        <> metavar "DEBUG|INFO|ERROR|NONE"
         <> value Error
         <> showDefault
   where
@@ -200,5 +200,6 @@ parseLogLevel =
         "debug" -> Just LogLevel.Debug
         "info"  -> Just LogLevel.Info
         "error" -> Just LogLevel.Error
+        "none"  -> Just LogLevel.None
         _       -> Nothing
 

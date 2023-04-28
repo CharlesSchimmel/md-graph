@@ -14,6 +14,10 @@ import           Data.Maybe                     ( fromMaybe )
 import           Data.Text                     as T
 import           Data.Text.IO                  as T
                                                 ( readFile )
+import           MdGraph.App.LogLevel           ( LogLevel(Debug) )
+import           MdGraph.App.Logger             ( trace'
+                                                , trace''
+                                                )
 import           MdGraph.File                   ( fixLink )
 import           Prelude                       as P
 import           System.Directory               ( doesFileExist
@@ -36,14 +40,8 @@ parseDocument defExt libraryPath file = do
     if not exists
         then return Nothing
         else do
-            fileContent <- T.readFile file
+            fileContent <- T.readFile absFile
             return $ do
                 PandocResult { tags, links } <- sieveLinks fileContent
                 return $ ParseResult file (S.toList links) (S.toList tags)
-  where
-    absFile = libraryPath </> file
-    parseFile :: FilePath -> IO PandocResult
-    parseFile file = do
-        content <- sieveLinks <$> T.readFile file
-        return $ fromMaybe mempty content
-
+    where absFile = libraryPath </> file

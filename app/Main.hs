@@ -51,7 +51,6 @@ main :: IO ()
 main = do
     args@Arguments{..} <- cliArguments
     conf <- runExceptT $ argsToConfig args
-    print conf
     -- TODO: Better error handling here
     forEither conf (T.putStrLn)
         $ \conf -> do
