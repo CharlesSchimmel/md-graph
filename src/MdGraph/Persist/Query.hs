@@ -18,6 +18,11 @@ import           Control.Monad.Reader           ( MonadIO(liftIO)
 import qualified Data.Map.Strict               as M
 import           Data.Text                      ( Text(..) )
 import           Database.Esqueleto.Experimental
+import           Database.Esqueleto.Experimental.From.SqlSetOperation
+                                                ( SqlSetOperation
+                                                    ( unSqlSetOperation
+                                                    )
+                                                )
 import           Database.Persist               ( Filter(..)
                                                 , deleteWhere
                                                 , insertMany
@@ -110,9 +115,9 @@ whereDocumentDeleted file = do
             pure $ tf ^. TempDocumentPath
         )
 
--- | Delete modified Documents (ie the TempDoc counterpart has a newer
--- Modified) so that they can be found when newDocs is run (we will have to
--- delete them anyway)
+-- | Delete modified Documents (modified determined when the TempDoc
+-- counterpart has a newer Modified) so that they can be found when newDocs is
+-- run (we will have to delete them anyway)
 pruneModifiedDocs connString = liftIO . runSqlite connString $ deleteCount $ do
     file <- from $ table @Document
     where_ $ file ^. DocumentPath `in_` subSelectList
@@ -129,7 +134,7 @@ pruneModifiedDocs connString = liftIO . runSqlite connString $ deleteCount $ do
             pure $ doc ^. DocumentPath
         )
 
--- Files with no edges to or from
+-- Files with no incoming or outgoing edges
 orphans connString = liftIO . runSqlite connString $ select $ do
     from
         $         from (table @Document)
@@ -146,5 +151,11 @@ filesThatHaveLinks = do
         \(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail
     pure file
 
--- Files with no edges to
-stranded = undefined
+-- Files with no incoming edges (but may have outgoing 
+stranded connString =
+    liftIO
+        . runSqlite connString
+        $ select
+        $ do
+              from
+        $ (filesThatHaveLinks `except_` filesThatAreLinkedTo)

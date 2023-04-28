@@ -134,6 +134,7 @@ prepareDatabase = do
     logInfo
         . T.unwords
         $ ["Found", T.pack . show . P.length $ newEdges, "new edges"]
+
     -- P.print newEdges
     logDebug "Inserting new edges"
     insertEdges dbConnString newEdges
