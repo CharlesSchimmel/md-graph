@@ -1,6 +1,7 @@
 module MdGraph.Parse
     ( ParseResult(..)
     , Parses(..)
+    , parseDocumentIO
     ) where
 
 import           MdGraph.Node

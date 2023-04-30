@@ -6,16 +6,32 @@ module MdGraph.Parse.Pandoc
 
 import           Control.Applicative
 import           Data.HashSet                  as S
+import           Data.List                     as L
+import           Data.Maybe                     ( catMaybes
+                                                , fromMaybe
+                                                )
 import           Data.Text                     as T
+import           Debug.Trace                    ( trace )
 import           MdGraph.Node
+import           MdGraph.Util                   ( trace' )
 import qualified Network.URI                   as URI
                                                 ( unEscapeString )
 import           Prelude                       as P
 import           System.FilePath                ( normalise )
+import           Text.Pandoc.Builder            ( MetaValue
+                                                    ( MetaInlines
+                                                    , MetaList
+                                                    )
+                                                , ToMetaValue(toMetaValue)
+                                                , lookupMeta
+                                                )
 import           Text.Pandoc.Class              ( runPure )
 import           Text.Pandoc.Definition        as Pandoc
                                                 ( Block(..)
                                                 , Inline(Image, Str)
+                                                , Meta(Meta)
+                                                , MetaValue
+                                                , Pandoc(Pandoc)
                                                 )
 import qualified Text.Pandoc.Definition        as Pandoc
                                                 ( Inline(Link) )
@@ -63,6 +79,23 @@ extractUrl _ = S.empty
 ignoreAnchors :: Text -> Text
 ignoreAnchors = T.takeWhile (/= '#')
 
+extractMarkdownLinks :: Text -> Either PandocError (HashSet Link)
+extractMarkdownLinks t = query extractUrl <$> (runPure . readMarkdown def $ t)
+
+extractVimWikiLinks :: Text -> Either PandocError (HashSet Link)
+extractVimWikiLinks t = query extractUrl <$> (runPure . readVimwiki def $ t)
+
+extractTags content = liftA2 S.union metadataTags inlineHashtags
+  where
+    inlineHashtags =
+        query extractHashTag <$> (runPure . readVimwiki def $ content)
+    metadataTags =
+        extractMetadataTags
+            <$> (runPure . readMarkdown markdownReaderOptions $ content)
+    markdownReaderOptions :: ReaderOptions
+    markdownReaderOptions =
+        def { readerExtensions = extensionsFromList [Ext_yaml_metadata_block] }
+
 -- Pandoc splits Str on whitespace; they are whitespace-less
 extractHashTag :: Inline -> HashSet Tag
 extractHashTag (Str tag) = case T.uncons tag of
@@ -72,17 +105,25 @@ extractHashTag (Str tag) = case T.uncons tag of
             else S.empty
     Just _  -> S.empty
     Nothing -> S.empty
-  where
-    validTagChars = S.fromList
-        $ P.concat [['a' .. 'z'], ['A' .. 'Z'], ['0' .. '9'], ['-', '_']]
-    isValidTagChar = flip S.member validTagChars
 extractHashTag _ = S.empty
 
-extractMarkdownLinks :: Text -> Either PandocError (HashSet Link)
-extractMarkdownLinks t = query extractUrl <$> (runPure . readMarkdown def $ t)
+validTagChars =
+    S.fromList $ P.concat [['a' .. 'z'], ['A' .. 'Z'], ['0' .. '9'], ['-', '_']]
+isValidTagChar = flip S.member validTagChars
 
-extractVimWikiLinks :: Text -> Either PandocError (HashSet Link)
-extractVimWikiLinks t = query extractUrl <$> (runPure . readVimwiki def $ t)
+parseMetadataTag :: Text -> Tag
+parseMetadataTag text = Tag actualTagText
+    where actualTagText = T.takeWhile isValidTagChar text
 
-extractTags content =
-    query extractHashTag <$> (runPure . readVimwiki def $ content)
+extractMetadataTags :: Pandoc -> HashSet Tag
+extractMetadataTags (Pandoc meta _) =
+    maybe S.empty S.fromList $ actualExtract <$> tags
+  where
+    tags = lookupMeta "tags" meta
+    actualExtract :: MetaValue -> [Tag]
+    actualExtract (MetaList values) = values >>= actualExtract
+    actualExtract (MetaInlines lines) =
+        parseMetadataTag <$> catMaybes (unInlines <$> lines)
+    actualExtract _ = []
+    unInlines (Str text) = Just text
+    unInlines _          = Nothing
