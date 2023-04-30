@@ -73,32 +73,40 @@ runNonexistant = do
   return $ entityVal <$> nonexes
 
 runSubgraph :: SubgraphOptions -> App [FilePath]
-runSubgraph options@SubgraphOptions { sgTargets } = do
+runSubgraph options@SubgraphOptions { sgTargets, sgDepth } = do
   logInfo . T.unwords $ ["Finding subgraphs"]
   -- let protoResults = runSubgraphOnArg <$> sgTargets
-  paths <- F.foldrM (flip runSubgraphOnArg) S.empty sgTargets
+  paths <- F.foldrM (flip $ runSubgraphOnArg sgDepth) S.empty sgTargets
   return $ S.toList paths
 
 runSubgraphOnArg
-  :: HashSet FilePath -> SubgraphTarget -> App (HashSet FilePath)
-runSubgraphOnArg foundPaths (FileTarget path) = do
+  :: Integer -> HashSet FilePath -> SubgraphTarget -> App (HashSet FilePath)
+runSubgraphOnArg maxDepth foundPaths (FileTarget path) = do
   libPath <- asks $ libraryPath . config
   absPath <- liftIO $ trueAbsolutePath path
   logDebug . T.unwords $ ["Abs path", T.pack absPath]
   let relPath =
         trace'' "Subgraph target relative path" $ makeRelative libPath absPath
-  runSubgraphPath' foundPaths relPath
+  runSubgraphPath' maxDepth 0 foundPaths relPath
 
-runSubgraphOnArg _ _ = throwError "Tag subgraph not yet implemented"
+runSubgraphOnArg _ _ _ = throwError "Tag subgraph not yet implemented"
 
-runSubgraphPath' :: S.HashSet FilePath -> FilePath -> App (HashSet FilePath)
-runSubgraphPath' foundPaths newPath = do
+runSubgraphPath'
+  :: Integer
+  -> Integer
+  -> S.HashSet FilePath
+  -> FilePath
+  -> App (HashSet FilePath)
+runSubgraphPath' maxDepth currentDepth foundPaths newPath = do
   let alreadyExists = S.member newPath foundPaths
-  if alreadyExists
+      pastMaxDepth  = currentDepth > maxDepth
+  if alreadyExists || pastMaxDepth
     then pure foundPaths
     else do
       connString <- asks $ dbConnString . config
       children   <- Q.forwardLinks connString newPath
       let setWithCurrent = S.insert newPath foundPaths
       let childPaths     = documentPath . entityVal <$> catMaybes children
-      F.foldrM (flip runSubgraphPath') setWithCurrent childPaths
+      F.foldrM (flip $ runSubgraphPath' maxDepth (currentDepth + 1))
+               setWithCurrent
+               childPaths

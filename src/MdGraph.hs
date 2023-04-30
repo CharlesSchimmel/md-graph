@@ -58,13 +58,13 @@ import           System.FilePath                ( (<.>)
                                                 , (</>)
                                                 )
 
-mdGraph :: Maybe Command -> App ()
-mdGraph maybeCommand = do
+mdGraph :: Command -> App ()
+mdGraph command = do
     prepareDatabase
-    (flip $ maybe (pure ())) maybeCommand $ \command -> do
-        logDebug . T.pack $ show command
-        docPaths <- runCommand command
-        liftIO $ F.mapM_ putStrLn docPaths
+    -- (flip $ maybe (pure ())) maybeCommand $ \command -> do
+    logDebug . T.pack $ show command
+    docPaths <- runCommand command
+    liftIO $ F.mapM_ putStrLn docPaths
 
 -- prepareDatabaseFile :: App ()
 -- prepareDatabaseFile = do

@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE ApplicativeDo #-}
 
 module MdGraph.App.Arguments
     ( Arguments(..)
@@ -32,7 +33,7 @@ data Arguments = Arguments
     , argDefExt   :: FilePath
     , argDatabase :: DatabaseArg
     , argLogLevel :: LogLevel
-    , argCommand  :: Maybe Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
+    , argCommand  :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
     }
     deriving Show
 
@@ -53,8 +54,8 @@ parseArguments =
         <*> parseLogLevel
         <*> parseCommand
 
-parseCommand :: Parser (Maybe Command)
-parseCommand = optional $ hsubparser
+parseCommand :: Parser (Command)
+parseCommand = hsubparser
     (  command
           "subgraph"
           ( info (Subgraph <$> (parseSubgraphOptions <*> parseDepth (-1)))
@@ -101,6 +102,7 @@ parseLibrary = strOption
     <> help "Directory to search"
     <> metavar "FILE|DIR"
     <> value "./"
+    <> showDefault
     )
 
 
