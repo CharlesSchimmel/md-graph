@@ -7,7 +7,6 @@ module MdGraph.Parse.Pandoc
 import           Control.Applicative
 import           Data.HashSet                  as S
 import           Data.Text                     as T
-import           MdGraph.App.Logger             ( trace' )
 import           MdGraph.Node
 import qualified Network.URI                   as URI
                                                 ( unEscapeString )

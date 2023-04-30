@@ -8,6 +8,7 @@ import           MdGraph.Parse.Pandoc
 
 import           Control.Concurrent.Async       ( mapConcurrently )
 import           Data.Either                    ( partitionEithers )
+import           Data.HashMap.Internal.Strict   ( toList )
 import qualified Data.HashSet                  as S
                                                 ( toList )
 import           Data.Maybe                     ( fromMaybe )
@@ -15,9 +16,6 @@ import           Data.Text                     as T
 import           Data.Text.IO                  as T
                                                 ( readFile )
 import           MdGraph.App.LogLevel           ( LogLevel(Debug) )
-import           MdGraph.App.Logger             ( trace'
-                                                , trace''
-                                                )
 import           MdGraph.File                   ( fixLink )
 import           Prelude                       as P
 import           System.Directory               ( doesFileExist

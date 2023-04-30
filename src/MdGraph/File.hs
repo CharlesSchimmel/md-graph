@@ -2,7 +2,12 @@ module MdGraph.File
     ( fixLink
     , findDocuments
     , File(..)
-    , FindsDocuments(..)
+    -- , FindsDocuments(..)
+    , maybeDirectory
+    , maybeFile
+    , maybePath
+    , trueAbsolutePath
+    , detilde
     ) where
 
 import           Control.Applicative
@@ -13,6 +18,7 @@ import           Control.Monad.Reader           ( asks )
 import           Control.Monad.Trans.Maybe
 import           Data.Foldable
 import           Data.Hashable                  ( Hashable )
+import qualified Data.List
 import           Data.Maybe
 import           Data.Text                     as T
                                                 ( pack
@@ -20,13 +26,13 @@ import           Data.Text                     as T
                                                 )
 import           Data.Time                      ( UTCTime )
 import           Data.Traversable              as T
-import           MdGraph.App                    ( App
-                                                , Env(config)
-                                                )
-import           MdGraph.App.Logger             ( logDebug
-                                                , logInfo
-                                                )
-import           MdGraph.Config
+-- import           MdGraph.App                    ( App
+--                                                 , Env(config)
+--                                                 )
+-- import           MdGraph.App.Logger             ( logDebug
+--                                                 , logInfo
+--                                                 )
+-- import           MdGraph.Config
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
@@ -37,24 +43,26 @@ data File = File
     }
     deriving (Show, Ord, Eq)
 
-class FindsDocuments m where
-  findDocumentsM :: m [File]
+-- class FindsDocuments m where
+--   findDocumentsM :: m [File]
 
-instance FindsDocuments App where
-    findDocumentsM = do
-        logDebug "Finding documents"
-        Config {..} <- asks config
-        docs        <- liftIO $ findDocuments defaultExtension [libraryPath]
-        logInfo
-            . T.unwords
-            $ ["Found", T.pack . show . P.length $ docs, "documents"]
-        return docs
+-- instance FindsDocuments App where
+--     findDocumentsM = do
+--         logDebug "Finding documents"
+--         Config {..} <- asks config
+--         docs        <- liftIO $ findDocuments defaultExtension [libraryPath]
+--         logInfo
+--             . T.unwords
+--             $ ["Found", T.pack . show . P.length $ docs, "documents"]
+--         return docs
 
 doubleDot :: FilePath
 doubleDot = ".."
 
 -- unsafe, need to switch to safe tail
 -- does not support oddly placed parent-traversal like `foo/bar/baz/../file-in-bar.md`
+-- | Given a source path and a destination path, make the destination path
+-- relative to the source
 reRelativize :: FilePath -> FilePath -> FilePath
 reRelativize source destination
     | not $ isRelative destination = destination
@@ -62,7 +70,7 @@ reRelativize source destination
   where
     sourceParts = splitDirectories $ takeDirectory source
     destParts   = splitDirectories destination
-    pops        = P.foldr
+    pops        = P.foldr -- todo: use normalise?
         (\cur acc -> if cur == doubleDot then P.tail . acc else acc)
         id
         destParts
@@ -101,6 +109,11 @@ maybeFile :: FilePath -> IO (Maybe FilePath)
 maybeFile file = do
     exists <- D.doesFileExist file
     pure $ if exists then Just file else Nothing
+
+maybeDirectory :: FilePath -> IO (Maybe FilePath)
+maybeDirectory dir = do
+    exists <- D.doesDirectoryExist dir
+    pure $ if exists then Just dir else Nothing
 
 -- | Find documents in library and return them with FilePaths relative to the
 -- library
@@ -157,3 +170,17 @@ relativizeDocument :: FilePath -> File -> File
 relativizeDocument baseDir doc@File { filePath } =
     doc { filePath = makeRelative baseDir filePath }
 
+-- | canonicalize path and also convert tilde home directory reference to actual
+trueAbsolutePath :: FilePath -> IO FilePath
+trueAbsolutePath path = do
+    detilde path >>= canonicalizePath
+
+detilde :: FilePath -> IO FilePath
+detilde path = do
+    homePath <- getHomeDirectory
+    let pathParts = splitPath path
+    return $ rejoin homePath pathParts
+  where
+    rejoin homePath []                 = ""
+    rejoin homePath ("~/" : pathParts) = joinPath (homePath : pathParts)
+    rejoin _        pathParts          = joinPath pathParts

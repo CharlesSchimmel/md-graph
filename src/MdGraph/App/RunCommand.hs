@@ -4,12 +4,15 @@ module MdGraph.App.RunCommand where
 import           Aux.HashSet
 import           MdGraph.TagDirection
 
+import           Control.Applicative            ( Applicative(liftA2) )
 import           Control.Monad                  ( join )
 import           Control.Monad.Except           ( MonadError(throwError)
                                                 , MonadIO(liftIO)
                                                 )
 import           Control.Monad.Reader           ( asks )
+import qualified Data.Foldable                 as F
 import           Data.HashSet                  as S
+import qualified Data.List                     as L
 import           Data.Maybe                     ( catMaybes )
 import qualified Data.Text                     as T
 import           Database.Persist               ( Entity(entityVal) )
@@ -17,12 +20,22 @@ import           MdGraph.App                    ( App
                                                 , Env(config)
                                                 )
 import           MdGraph.App.Command
-import           MdGraph.App.Logger             ( logDebug )
-import           MdGraph.Config                 ( Config(dbConnString) )
+import           MdGraph.App.Logger             ( logDebug
+                                                , logInfo
+                                                )
+import           MdGraph.Config                 ( Config
+                                                  ( dbConnString
+                                                  , libraryPath
+                                                  )
+                                                )
+import           MdGraph.File                   ( trueAbsolutePath )
 import           MdGraph.Persist.Query         as Q
 import           MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema        as Edge
                                                 ( Edge(..) )
+import           MdGraph.Util                   ( trace'' )
+import           System.Directory               ( canonicalizePath )
+import           System.FilePath                ( makeRelative )
 
 
 
@@ -60,17 +73,32 @@ runNonexistant = do
   return $ entityVal <$> nonexes
 
 runSubgraph :: SubgraphOptions -> App [FilePath]
-runSubgraph options@SubgraphOptions { sgTargets } =
-  join <$> mapM runSubgraph' sgTargets
+runSubgraph options@SubgraphOptions { sgTargets } = do
+  logInfo . T.unwords $ ["Finding subgraphs"]
+  -- let protoResults = runSubgraphOnArg <$> sgTargets
+  paths <- F.foldrM (flip runSubgraphOnArg) S.empty sgTargets
+  return $ S.toList paths
 
-runSubgraph' :: SubgraphTarget -> App [FilePath]
-runSubgraph' (FileTarget path) = runSubgraphPath path
-runSubgraph' _                 = throwError "NYI"
+runSubgraphOnArg
+  :: HashSet FilePath -> SubgraphTarget -> App (HashSet FilePath)
+runSubgraphOnArg foundPaths (FileTarget path) = do
+  libPath <- asks $ libraryPath . config
+  absPath <- liftIO $ trueAbsolutePath path
+  logDebug . T.unwords $ ["Abs path", T.pack absPath]
+  let relPath =
+        trace'' "Subgraph target relative path" $ makeRelative libPath absPath
+  runSubgraphPath' foundPaths relPath
 
-runSubgraphPath :: FilePath -> App [FilePath]
-runSubgraphPath path = do
-  connString <- asks $ dbConnString . config
-  nonexes    <- Q.forwardLinks connString path
-  let paths = documentPath . entityVal <$> catMaybes nonexes
-  recurse <- join <$> mapM runSubgraphPath paths
-  return $ path : recurse
+runSubgraphOnArg _ _ = throwError "Tag subgraph not yet implemented"
+
+runSubgraphPath' :: S.HashSet FilePath -> FilePath -> App (HashSet FilePath)
+runSubgraphPath' foundPaths newPath = do
+  let alreadyExists = S.member newPath foundPaths
+  if alreadyExists
+    then pure foundPaths
+    else do
+      connString <- asks $ dbConnString . config
+      children   <- Q.forwardLinks connString newPath
+      let setWithCurrent = S.insert newPath foundPaths
+      let childPaths     = documentPath . entityVal <$> catMaybes children
+      F.foldrM (flip runSubgraphPath') setWithCurrent childPaths

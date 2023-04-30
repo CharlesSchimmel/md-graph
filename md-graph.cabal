@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9a16cdee8d2b867301fabb88c4d6e529dbbabc1ba44b69543cfc5d91e4a5c157
+-- hash: 65323247cf4b4e9fa7f772bfaba94a2e8ae675c7f60fce7a4c229c03587e10dd
 
 name:           md-graph
 version:        0.1.0.0
@@ -50,6 +50,7 @@ library
       MdGraph.Persist.Query
       MdGraph.Persist.Schema
       MdGraph.TagDirection
+      MdGraph.Util
   other-modules:
       Paths_md_graph
   hs-source-dirs:

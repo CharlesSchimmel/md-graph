@@ -32,7 +32,7 @@ data Arguments = Arguments
     , argDefExt   :: FilePath
     , argDatabase :: DatabaseArg
     , argLogLevel :: LogLevel
-    , argCommand  :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
+    , argCommand  :: Maybe Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
     }
     deriving Show
 
@@ -53,8 +53,8 @@ parseArguments =
         <*> parseLogLevel
         <*> parseCommand
 
-parseCommand :: Parser Command
-parseCommand = hsubparser
+parseCommand :: Parser (Maybe Command)
+parseCommand = optional $ hsubparser
     (  command
           "subgraph"
           ( info (Subgraph <$> (parseSubgraphOptions <*> parseDepth (-1)))

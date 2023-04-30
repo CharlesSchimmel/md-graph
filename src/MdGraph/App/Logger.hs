@@ -40,6 +40,3 @@ instance Logs App where
         if minLogLevel <= msgLogLevel
             then liftIO $ log msgLogLevel msg
             else pure ()
-
-trace' x = trace (show x) x
-trace'' note x = trace (note ++ " " ++ show x) x

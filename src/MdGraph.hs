@@ -5,8 +5,8 @@ import           MdGraph.App
 import           MdGraph.App.Arguments
 import           MdGraph.App.Logger
 import           MdGraph.Config
-import           MdGraph.File                   ( FindsDocuments(findDocumentsM)
-                                                , findDocuments
+import           MdGraph.File                   ( findDocuments
+                                                , maybeFile
                                                 )
 import           MdGraph.Parse                  ( ParseResult(..)
                                                 , parseDocument
@@ -43,6 +43,7 @@ import           Database.Persist.Sqlite        ( Entity(entityVal)
 import           Debug.Trace                    ( trace )
 import           MdGraph.App.Command            ( Command )
 import           MdGraph.App.RunCommand         ( runCommand )
+import           MdGraph.Node                   ( Link(..) )
 import           Options.Applicative
 import           Prelude
 import           Prelude                       as P
@@ -53,14 +54,17 @@ import           Prelude                       as P
                                                 , print
                                                 , putStrLn
                                                 )
-import           System.FilePath                ( (</>) )
+import           System.FilePath                ( (<.>)
+                                                , (</>)
+                                                )
 
-mdGraph :: Command -> App ()
-mdGraph command = do
+mdGraph :: Maybe Command -> App ()
+mdGraph maybeCommand = do
     prepareDatabase
-    logDebug . T.pack $ show command
-    docPaths <- runCommand command
-    liftIO $ F.mapM_ putStrLn docPaths
+    (flip $ maybe (pure ())) maybeCommand $ \command -> do
+        logDebug . T.pack $ show command
+        docPaths <- runCommand command
+        liftIO $ F.mapM_ putStrLn docPaths
 
 -- prepareDatabaseFile :: App ()
 -- prepareDatabaseFile = do
@@ -114,9 +118,9 @@ prepareDatabase = do
         $   catMaybes
         <$> mapConcurrently (parseDocument defaultExtension libraryPath)
                             docPathsToParse
+    updatedResults <- updateLinks parseResults
 
-    -- TODO: Why are parse results not working?
-    let resultMap = M.fromList' file parseResults
+    let resultMap = M.fromList' file updatedResults
         pathToKeyResult =
             P.map snd . M.toList $ M.unionWith' docKeyMap resultMap
         newTagsAndEdges :: [([Tag], [Edge])]
@@ -151,3 +155,21 @@ prepareDatabase = do
 reportDocumentCount num reason = do
     logInfo . T.unwords $ [T.pack . show $ num, reason]
     pure ()
+
+-- | Update links to include the extension if they were defined without one,
+-- and their link-path.md resolves to a real file
+updateLinks :: [ParseResult] -> App [ParseResult]
+updateLinks results = do
+    libPath <- asks $ libraryPath . config
+    defExt  <- asks $ defaultExtension . config
+    let tryResolveDoc result@ParseResult { links } = do
+            resolvedLinks <- mapM tryResolveLink links
+            return result { links = resolvedLinks }
+        tryResolveLink :: Link -> App Link
+        tryResolveLink link@Link { linkPath } = do
+            let withExtension = linkPath <.> defExt
+            exists <- liftIO . maybeFile $ libPath </> withExtension
+            return $ maybe link (const link { linkPath = withExtension }) exists
+
+    P.mapM tryResolveDoc results
+
