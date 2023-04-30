@@ -19,6 +19,10 @@ module MdGraph.Persist.Schema where
 import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
+import           Control.Monad.Logger           ( NoLoggingT )
+import           Control.Monad.Reader           ( ReaderT )
+import           Control.Monad.Trans.Resource   ( ResourceT )
+import           Data.Text                      ( Text )
 import           Data.Time.Clock
 import           Database.Persist
 import           Database.Persist.Quasi
@@ -67,5 +71,7 @@ Edge
     deriving Show
 |]
 
-migrateMdGraph connString =
-    liftIO . runSqlite connString $ runMigrationQuiet migrateAll
+type Query a = ReaderT SqlBackend (NoLoggingT (ResourceT IO)) a
+
+migrateMdGraph :: Query [Text]
+migrateMdGraph = runMigrationQuiet migrateAll

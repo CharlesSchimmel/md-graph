@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module MdGraph where
 
 import           Aux.Map                       as M
@@ -5,14 +6,11 @@ import           MdGraph.App
 import           MdGraph.App.Arguments
 import           MdGraph.App.Logger
 import           MdGraph.Config
-import           MdGraph.File.Internal          ( findDocuments
-                                                , maybeFile
-                                                )
+import           MdGraph.File                   ( Files(..) )
 import           MdGraph.Parse                  ( ParseResult(..)
-                                                , parseDocument
+                                                , Parses(..)
                                                 )
 import           MdGraph.Persist.Mapper        as Mapper
-import           MdGraph.Persist.Query
 import           MdGraph.Persist.Schema         ( Document(documentPath)
                                                 , Edge(..)
                                                 , Tag(..)
@@ -44,6 +42,7 @@ import           Debug.Trace                    ( trace )
 import           MdGraph.App.Command            ( Command )
 import           MdGraph.App.RunCommand         ( runCommand )
 import           MdGraph.Node                   ( Link(..) )
+import           MdGraph.Persist.Class          ( PreparesDb(..) )
 import           Options.Applicative
 import           Prelude
 import           Prelude                       as P
@@ -70,32 +69,31 @@ mdGraph command = do
 -- prepareDatabaseFile = do
 
 
-prepareDatabase :: App ()
+prepareDatabase :: (Monad m, PreparesDb m, Logs m, Files m, Parses m) => m ()
 prepareDatabase = do
-    Config {..} <- asks config
     logDebug "Preparing database"
-    migrateMdGraph dbConnString
+    migrate
 
     -- find documents
     logDebug "Finding documents"
-    docs <- liftIO $ findDocuments defaultExtension [libraryPath]
+    docs <- findDocuments
     let totalCt = P.length docs
 
     -- load all found documents into temp
     logDebug "Populating TempDocuments"
-    insertTempDocuments dbConnString $ Mapper.fromFile <$> docs
+    insertTempDocuments $ Mapper.fromFile <$> docs
 
     logDebug "Pruning deleted Documents"
-    deletedCt <- pruneDeletedDocuments dbConnString
+    deletedCt <- pruneDeletedDocuments
 
     logDebug "Pruning unchanged TempDocuments"
-    unchangedCt <- pruneUnchangedTempDocs dbConnString
+    unchangedCt <- pruneUnchangedTempDocuments
 
     logDebug "Pruning modified Documents"
-    modifiedCt <- pruneModifiedDocs dbConnString
+    modifiedCt <- pruneModifiedDocuments
 
     logDebug "Finding new and modified TempDocuments"
-    newTempDocs <- newFiles dbConnString
+    newTempDocs <- getNewDocuments
     let docsToInsert = fromTempDocument . entityVal <$> newTempDocs
         newCt        = P.length docsToInsert - fromIntegral modifiedCt
 
@@ -106,18 +104,14 @@ prepareDatabase = do
     reportDocumentCount newCt       "new"
 
     logDebug "Inserting new and modified Documents"
-    newDocs <- insertDocuments dbConnString docsToInsert
+    newDocs <- insertDocuments docsToInsert
 
     let docKeyMap       = M.flop documentPath newDocs
         docPathsToParse = M.keys docKeyMap
 
     logDebug "Parsing new and modified Documents"
     -- TODO: Need to fix link targets, missing extensions
-    parseResults <-
-        liftIO
-        $   catMaybes
-        <$> mapConcurrently (parseDocument defaultExtension libraryPath)
-                            docPathsToParse
+    parseResults   <- parseDocuments docPathsToParse
     updatedResults <- updateLinks parseResults
 
     let resultMap = M.fromList' file updatedResults
@@ -142,13 +136,13 @@ prepareDatabase = do
 
     -- P.print newEdges
     logDebug "Inserting new edges"
-    insertEdges dbConnString newEdges
+    insertEdges newEdges
 
     logInfo
         . T.unwords
         $ ["Found", T.pack . show . P.length $ newEdges, "new tags"]
     logDebug "Inserting new tags"
-    insertTags dbConnString newTags
+    insertTags newTags
 
     pure ()
 
@@ -158,18 +152,15 @@ reportDocumentCount num reason = do
 
 -- | Update links to include the extension if they were defined without one,
 -- and their link-path.md resolves to a real file
-updateLinks :: [ParseResult] -> App [ParseResult]
+updateLinks
+    :: forall m . (Monad m, Files m) => [ParseResult] -> m [ParseResult]
 updateLinks results = do
-    libPath <- asks $ libraryPath . config
-    defExt  <- asks $ defaultExtension . config
     let tryResolveDoc result@ParseResult { links } = do
             resolvedLinks <- mapM tryResolveLink links
             return result { links = resolvedLinks }
-        tryResolveLink :: Link -> App Link
+        tryResolveLink :: (Monad m, Files m) => Link -> m Link
         tryResolveLink link@Link { linkPath } = do
-            let withExtension = linkPath <.> defExt
-            exists <- liftIO . maybeFile $ libPath </> withExtension
-            return $ maybe link (const link { linkPath = withExtension }) exists
+            actualPath <- getAbsoluteDocumentPath linkPath
+            return $ link { linkPath = actualPath }
 
     P.mapM tryResolveDoc results
-

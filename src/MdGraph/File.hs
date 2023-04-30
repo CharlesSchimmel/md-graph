@@ -23,10 +23,27 @@ import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
-import           MdGraph.File.Internal
+import           MdGraph.Config                 ( Config(..)
+                                                , HasConfig(getConfig)
+                                                )
+import qualified MdGraph.File.Internal         as Internal
+import           MdGraph.File.Internal          ( File(..) )
 
 class Files m where
   trueAbsolutePath :: FilePath -> m FilePath
+  maybePath :: FilePath -> m (Maybe FilePath)
+  maybeFile :: FilePath -> m (Maybe FilePath)
+  findDocuments :: m [File]
+  getAbsoluteDocumentPath :: FilePath -> m FilePath
 
 instance Files App where
-    trueAbsolutePath = liftIO . trueAbsolutePathIO
+    trueAbsolutePath = liftIO . Internal.trueAbsolutePathIO
+    maybePath        = liftIO . Internal.maybePath
+    maybeFile        = liftIO . Internal.maybeFile
+    findDocuments    = do
+        config@Config {..} <- getConfig
+        liftIO $ Internal.findDocuments defaultExtension [libraryPath]
+    getAbsoluteDocumentPath path = do
+        Config {..} <- getConfig
+        let withExtension = path <.> defaultExtension
+        fromMaybe path <$> maybeFile (libraryPath </> withExtension)

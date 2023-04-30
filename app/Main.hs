@@ -7,9 +7,6 @@ import           MdGraph.App
 import           MdGraph.App.Arguments
 import           MdGraph.App.Logger
 import           MdGraph.Config
-import           MdGraph.Parse                  ( ParseResult(..)
-                                                , parseDocument
-                                                )
 import           MdGraph.Persist
 import           MdGraph.Persist.Mapper        as Mapper
 import           MdGraph.Persist.Schema         ( Document(documentPath)

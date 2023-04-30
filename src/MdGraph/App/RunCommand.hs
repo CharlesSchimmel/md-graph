@@ -35,6 +35,7 @@ import           MdGraph.Config                 ( Config
 import           MdGraph.File                   ( Files
                                                 , trueAbsolutePath
                                                 )
+import           MdGraph.Persist.Class          ( Queries(..) )
 import           MdGraph.Persist.Query         as Q
 import           MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema        as Edge
@@ -54,36 +55,35 @@ runCommand (Backlinks options) = runBacklinks options
 runCommand Statics             = throwError "NYI"
 runCommand Populate            = pure mempty
 
-runOrphans :: (Monad m, RunsQuery m, Logs m) => m [Document]
+runOrphans :: (Monad m, Queries m, Logs m) => m [Document]
 runOrphans = do
-  orphanDocs <- runQuery Q.orphansM
+  orphanDocs <- getUnreachables
   logDebug $ T.unwords ["Found", T.pack . show . length $ orphanDocs, "orphans"]
   return $ entityVal <$> orphanDocs
 
-runUnreachable :: (Monad m, RunsQuery m, Logs m) => m [Document]
+runUnreachable :: (Monad m, Queries m, Logs m) => m [Document]
 runUnreachable = do
-  orphanDocs <- runQuery Q.unreachableM
+  orphanDocs <- getUnreachables
   logDebug
     $ T.unwords ["Found", T.pack . show . length $ orphanDocs, "unreachable"]
   return $ entityVal <$> orphanDocs
 
-runNonexistant :: (Monad m, RunsQuery m, Logs m) => m [Edge]
+runNonexistant :: (Monad m, Queries m, Logs m) => m [Edge]
 runNonexistant = do
-  nonexes <- runQuery Q.nonexistant
+  nonexes <- getNonexistants
   logDebug
     $ T.unwords ["Found", T.pack . show . length $ nonexes, "nonexistant"]
   return $ entityVal <$> nonexes
 
 runSubgraph
-  :: (RunsQuery m, Logs m, Files m, HasConfig m)
+  :: (Monad m, Queries m, Logs m, Files m, HasConfig m)
   => SubgraphOptions
   -> m [FilePath]
 runSubgraph options@SubgraphOptions { sgTargets, sgDepth } = do
   logInfo . T.unwords $ ["Finding subgraphs"]
-  paths <- F.foldrM
-    (flip $ runSubgraphOnArg (runQuery . Q.forwardLinks) sgDepth)
-    S.empty
-    sgTargets
+  paths <- F.foldrM (flip $ runSubgraphOnArg getForwardLinks sgDepth)
+                    S.empty
+                    sgTargets
   return $ S.toList paths
 
 type LinkGetter m = FilePath -> m [Entity Document]
@@ -129,8 +129,7 @@ runSubgraphPath' linkGetter maxDepth currentDepth foundPaths newPath = do
 runBacklinks :: BacklinkOptions -> App [FilePath]
 runBacklinks options@BacklinkOptions { blTargets, blDepth } = do
   logInfo . T.unwords $ ["Finding backlinks"]
-  paths <- F.foldrM
-    (flip $ runSubgraphOnArg (runQuery . Q.backwardLinks) blDepth)
-    S.empty
-    blTargets
+  paths <- F.foldrM (flip $ runSubgraphOnArg getBackwardLinks blDepth)
+                    S.empty
+                    blTargets
   return $ S.toList paths
