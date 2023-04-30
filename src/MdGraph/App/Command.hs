@@ -28,17 +28,17 @@ data SubgraphTarget = FileTarget FilePath | TagTarget FilePath
     deriving Show
 
 data SubgraphOptions = SubgraphOptions
-    { sgTargets    :: [SubgraphTarget]
-    , sgInclNonex  :: Bool
-    , sgInclStatic :: Bool
-    , sgTagDir     :: TagDirection
-    , sgDepth      :: Integer
-    }
-    deriving Show
+  { sgTargets    :: [SubgraphTarget] -- TODO: Subgraph of a tag does not really make sense, tags can only be linked to
+  , sgInclNonex  :: Bool
+  , sgInclStatic :: Bool
+  , sgTagDir     :: TagDirection
+  , sgDepth      :: Integer
+  }
+  deriving Show
 
 
 data BacklinkOptions = BacklinkOptions
-    { blTargets :: [SubgraphTarget]
-    , blDepth   :: Integer
-    }
-    deriving Show
+  { blTargets :: [SubgraphTarget]
+  , blDepth   :: Integer
+  }
+  deriving Show

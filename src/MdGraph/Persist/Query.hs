@@ -188,7 +188,6 @@ backwardLinks connString docPath = liftIO . runSqlite connString $ select $ do
     where_ (childDoc ^. DocumentPath ==. val docPath)
     pure parentDoc
 
-
 forwardLinks :: MonadIO m => T.Text -> FilePath -> m [Entity Document]
 forwardLinks connString docPath = do
     documents <- liftIO . runSqlite connString $ select $ do

@@ -43,9 +43,9 @@ runCommand :: Command -> App [String]
 runCommand Orphans             = fmap documentPath <$> runOrphans
 runCommand Unreachable         = fmap documentPath <$> runUnreachable
 runCommand Nonexes             = fmap edgeHead <$> runNonexistant
-runCommand Statics             = throwError "NYI"
 runCommand (Subgraph  options) = runSubgraph options
 runCommand (Backlinks options) = runBacklinks options
+runCommand Statics             = throwError "NYI"
 runCommand Populate            = pure mempty
 
 runOrphans :: App [Document]
@@ -91,7 +91,6 @@ runSubgraphOnArg
 runSubgraphOnArg linkGetter maxDepth foundPaths (FileTarget path) = do
   libPath <- asks $ libraryPath . config
   absPath <- liftIO $ trueAbsolutePath path
-  logDebug . T.unwords $ ["Abs path", T.pack absPath]
   let relPath = makeRelative libPath absPath
   -- TODO: fix infinite depth to be a real value instead of this hack
   runSubgraphPath' linkGetter maxDepth 0 foundPaths relPath
@@ -112,7 +111,7 @@ runSubgraphPath' linkGetter maxDepth currentDepth foundPaths newPath = do
     then pure foundPaths
     else do
       connString <- asks $ dbConnString . config
-      children   <- Q.forwardLinks connString newPath
+      children   <- linkGetter connString newPath
       let setWithCurrent = S.insert newPath foundPaths
       let childPaths     = documentPath . entityVal <$> children
       F.foldrM
@@ -120,10 +119,10 @@ runSubgraphPath' linkGetter maxDepth currentDepth foundPaths newPath = do
         setWithCurrent
         childPaths
 
+-- not working, not sure why. it's only returning the child
 runBacklinks :: BacklinkOptions -> App [FilePath]
 runBacklinks options@BacklinkOptions { blTargets, blDepth } = do
   logInfo . T.unwords $ ["Finding backlinks"]
-  -- let protoResults = runSubgraphOnArg <$> sgTargets
   paths <- F.foldrM (flip $ runSubgraphOnArg Q.backwardLinks blDepth)
                     S.empty
                     blTargets

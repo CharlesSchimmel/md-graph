@@ -66,9 +66,10 @@ ignoreAnchors = T.takeWhile (/= '#')
 -- Pandoc splits Str on whitespace; they are whitespace-less
 extractHashTag :: Inline -> HashSet Tag
 extractHashTag (Str tag) = case T.uncons tag of
-    Just ('#', tagText) -> if T.all isValidTagChar tagText
-        then S.singleton $ Tag tagText
-        else S.empty
+    Just ('#', tagText) ->
+        if T.all isValidTagChar tagText && tagText /= T.empty
+            then S.singleton $ Tag tagText
+            else S.empty
     Just _  -> S.empty
     Nothing -> S.empty
   where
