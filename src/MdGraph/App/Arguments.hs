@@ -54,7 +54,7 @@ parseArguments =
         <*> parseLogLevel
         <*> parseCommand
 
-parseCommand :: Parser (Command)
+parseCommand :: Parser Command
 parseCommand = hsubparser
     (  command
           "subgraph"
@@ -79,6 +79,9 @@ parseCommand = hsubparser
            ( info (pure Statics)
            $ progDesc "Links that can be resolved but are not notes"
            )
+    <> command
+           "populate"
+           (info (pure Populate) $ progDesc "Just populate the database")
     )
 
 parseDatabase :: Parser DatabaseArg
@@ -194,7 +197,7 @@ parseLogLevel =
         <> help "Modify the logging level"
         <> short 'v'
         <> metavar "DEBUG|INFO|ERROR|NONE"
-        <> value Error
+        <> value Info
         <> showDefault
   where
     readVerbosity :: ReadM LogLevel
