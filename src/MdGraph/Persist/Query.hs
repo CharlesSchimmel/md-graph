@@ -30,7 +30,9 @@ import           Control.Monad.Reader           ( MonadIO(liftIO)
                                                 , local
                                                 )
 import qualified Data.Map.Strict               as M
+import           Data.Maybe                     ( catMaybes )
 import           Data.Text                      ( Text(..) )
+import           Data.Text                     as T
 import           Database.Esqueleto.Experimental
 import           Database.Esqueleto.Experimental.From.SqlSetOperation
                                                 ( SqlSetOperation
@@ -174,30 +176,34 @@ unreachable connString =
               from
         $ (filesThatHaveLinks `except_` filesThatAreLinkedTo)
 
+backwardLinks :: MonadIO m => T.Text -> FilePath -> m [Entity Document]
 backwardLinks connString docPath = liftIO . runSqlite connString $ select $ do
-    (parentDoc :& edge :& childDoc) <-
+    (childDoc :& edge :& parentDoc) <-
         from
         $           table @Document
         `innerJoin` table @Edge
-        `on`        (\(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail)
+        `on`        (\(cd :& e) -> cd ^. DocumentPath ==. e ^. EdgeHead)
         `innerJoin` table @Document
-        `on` (\(_ :& edge :& doc) -> doc ^. DocumentPath ==. edge ^. EdgeHead)
-    where_ (childDoc ^. DocumentPath ==. docPath)
+        `on`        (\(_ :& e :& pd) -> pd ^. DocumentId ==. e ^. EdgeTail)
+    where_ (childDoc ^. DocumentPath ==. val docPath)
     pure parentDoc
 
 
-forwardLinks connString docPath = liftIO . runSqlite connString $ select $ do
-    (parentDoc :& edge :& childDoc) <-
-        from
-        $           table @Document
-        `innerJoin` table @Edge
-        `on`        (\(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail)
-        `leftJoin`  table @Document
-        `on`        (\(_ :& edge :& doc) ->
-                        just (edge ^. EdgeHead) ==. doc ?. DocumentPath
-                    )
-    where_ (parentDoc ^. DocumentPath ==. val docPath)
-    pure childDoc
+forwardLinks :: MonadIO m => T.Text -> FilePath -> m [Entity Document]
+forwardLinks connString docPath = do
+    documents <- liftIO . runSqlite connString $ select $ do
+        (parentDoc :& edge :& childDoc) <-
+            from
+            $           table @Document
+            `innerJoin` table @Edge
+            `on` (\(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail)
+            `leftJoin`  table @Document
+            `on`        (\(_ :& edge :& doc) ->
+                            just (edge ^. EdgeHead) ==. doc ?. DocumentPath
+                        )
+        where_ (parentDoc ^. DocumentPath ==. val docPath)
+        pure childDoc
+    return $ catMaybes documents
 
 
 -- | Edges without associated files

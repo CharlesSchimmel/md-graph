@@ -45,7 +45,7 @@ runCommand Unreachable         = fmap documentPath <$> runUnreachable
 runCommand Nonexes             = fmap edgeHead <$> runNonexistant
 runCommand Statics             = throwError "NYI"
 runCommand (Subgraph  options) = runSubgraph options
-runCommand (Backlinks options) = throwError "NYI"
+runCommand (Backlinks options) = runBacklinks options
 runCommand Populate            = pure mempty
 
 runOrphans :: App [Document]
@@ -76,37 +76,55 @@ runSubgraph :: SubgraphOptions -> App [FilePath]
 runSubgraph options@SubgraphOptions { sgTargets, sgDepth } = do
   logInfo . T.unwords $ ["Finding subgraphs"]
   -- let protoResults = runSubgraphOnArg <$> sgTargets
-  paths <- F.foldrM (flip $ runSubgraphOnArg sgDepth) S.empty sgTargets
+  paths <- F.foldrM (flip $ runSubgraphOnArg Q.forwardLinks sgDepth)
+                    S.empty
+                    sgTargets
   return $ S.toList paths
 
+type LinkGetter = T.Text -> FilePath -> App [Entity Document]
 runSubgraphOnArg
-  :: Integer -> HashSet FilePath -> SubgraphTarget -> App (HashSet FilePath)
-runSubgraphOnArg maxDepth foundPaths (FileTarget path) = do
+  :: LinkGetter
+  -> Integer
+  -> HashSet FilePath
+  -> SubgraphTarget
+  -> App (HashSet FilePath)
+runSubgraphOnArg linkGetter maxDepth foundPaths (FileTarget path) = do
   libPath <- asks $ libraryPath . config
   absPath <- liftIO $ trueAbsolutePath path
   logDebug . T.unwords $ ["Abs path", T.pack absPath]
-  let relPath =
-        trace'' "Subgraph target relative path" $ makeRelative libPath absPath
-  runSubgraphPath' maxDepth 0 foundPaths relPath
+  let relPath = makeRelative libPath absPath
+  -- TODO: fix infinite depth to be a real value instead of this hack
+  runSubgraphPath' linkGetter maxDepth 0 foundPaths relPath
 
-runSubgraphOnArg _ _ _ = throwError "Tag subgraph not yet implemented"
+runSubgraphOnArg _ _ _ _ = throwError "Tag subgraph not yet implemented"
 
 runSubgraphPath'
-  :: Integer
+  :: LinkGetter
+  -> Integer
   -> Integer
   -> S.HashSet FilePath
   -> FilePath
   -> App (HashSet FilePath)
-runSubgraphPath' maxDepth currentDepth foundPaths newPath = do
+runSubgraphPath' linkGetter maxDepth currentDepth foundPaths newPath = do
   let alreadyExists = S.member newPath foundPaths
-      pastMaxDepth  = currentDepth > maxDepth
+      pastMaxDepth  = currentDepth == maxDepth
   if alreadyExists || pastMaxDepth
     then pure foundPaths
     else do
       connString <- asks $ dbConnString . config
       children   <- Q.forwardLinks connString newPath
       let setWithCurrent = S.insert newPath foundPaths
-      let childPaths     = documentPath . entityVal <$> catMaybes children
-      F.foldrM (flip $ runSubgraphPath' maxDepth (currentDepth + 1))
-               setWithCurrent
-               childPaths
+      let childPaths     = documentPath . entityVal <$> children
+      F.foldrM
+        (flip $ runSubgraphPath' linkGetter maxDepth (currentDepth + 1))
+        setWithCurrent
+        childPaths
+
+runBacklinks :: BacklinkOptions -> App [FilePath]
+runBacklinks options@BacklinkOptions { blTargets, blDepth } = do
+  logInfo . T.unwords $ ["Finding backlinks"]
+  -- let protoResults = runSubgraphOnArg <$> sgTargets
+  paths <- F.foldrM (flip $ runSubgraphOnArg Q.backwardLinks blDepth)
+                    S.empty
+                    blTargets
+  return $ S.toList paths

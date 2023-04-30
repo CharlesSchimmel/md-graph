@@ -63,7 +63,7 @@ parseCommand = hsubparser
           )
     <> command
            "backlinks"
-           ( info (Backlinks <$> (parseBacklinkOptions <*> parseDepth 1))
+           ( info (Backlinks <$> (parseBacklinkOptions <*> parseDepth 2))
            $ progDesc "The backlinks (reverse subgraph) of a node"
            )
     <> command
