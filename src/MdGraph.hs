@@ -5,7 +5,7 @@ import           MdGraph.App
 import           MdGraph.App.Arguments
 import           MdGraph.App.Logger
 import           MdGraph.Config
-import           MdGraph.File                   ( findDocuments
+import           MdGraph.File.Internal          ( findDocuments
                                                 , maybeFile
                                                 )
 import           MdGraph.Parse                  ( ParseResult(..)

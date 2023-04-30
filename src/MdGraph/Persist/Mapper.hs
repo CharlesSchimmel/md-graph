@@ -3,7 +3,7 @@ module MdGraph.Persist.Mapper where
 
 import qualified Data.Text                     as T
 import           Data.Traversable               ( for )
-import qualified MdGraph.File                  as Dto
+import qualified MdGraph.File.Internal         as Dto
 import qualified MdGraph.Node                  as Node
 import           MdGraph.Parse                  ( ParseResult(..) )
 import           MdGraph.Persist.Schema

@@ -1,11 +1,12 @@
 module Main where
 
+import           Aux.Common
 import           Aux.Map                       as M
-import Aux.Common
-import MdGraph
+import           MdGraph
+import           MdGraph.App
 import           MdGraph.App.Arguments
 import           MdGraph.App.Logger
-import           MdGraph.File                   ( findDocuments )
+import           MdGraph.Config
 import           MdGraph.Parse                  ( ParseResult(..)
                                                 , parseDocument
                                                 )
@@ -17,8 +18,6 @@ import           MdGraph.Persist.Schema         ( Document(documentPath)
                                                 , TempDocument(tempDocumentPath)
                                                 , migrateMdGraph
                                                 )
-import           MdGraph.App
-import           MdGraph.Config
 
 import           Control.Concurrent.Async       ( mapConcurrently )
 import           Control.Monad                  ( forM
@@ -36,7 +35,7 @@ import           Data.HashSet                  as S
 import qualified Data.Map.Strict               as M
 import           Data.Maybe                     ( catMaybes )
 import           Data.Text                     as T
-import           Data.Text.IO                     as T
+import           Data.Text.IO                  as T
 import           Options.Applicative
 import           Prelude
 import           Prelude                       as P
@@ -49,11 +48,10 @@ import           Prelude                       as P
 
 main :: IO ()
 main = do
-    args@Arguments{..} <- cliArguments
-    conf <- runExceptT $ argsToConfig args
-    -- TODO: Better error handling here
-    forEither conf (T.putStrLn)
-        $ \conf -> do
-           let env = Env conf
-           out <- runExceptT (runReaderT (runApp $ mdGraph argCommand) env)
-           either T.putStrLn (const $ pure ()) out
+  args@Arguments {..} <- cliArguments
+  conf                <- runExceptT $ argsToConfig args
+  -- TODO: Better error handling here
+  forEither conf (T.putStrLn) $ \conf -> do
+    let env = Env conf
+    out <- runExceptT (runReaderT (runApp $ mdGraph argCommand) env)
+    either T.putStrLn (const $ pure ()) out

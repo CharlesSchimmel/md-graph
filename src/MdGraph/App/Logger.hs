@@ -14,12 +14,13 @@ import           MdGraph.App                    ( App(..)
                                                 )
 import           MdGraph.App.LogLevel
 import           MdGraph.Config
+import           System.IO                      ( stderr )
 
 class Logs m where
   log :: LogLevel -> T.Text -> m ()
 
 instance Logs IO where
-    log logLevel msg = Tio.putStrLn $ formatMsg logLevel msg
+    log logLevel msg = Tio.hPutStrLn stderr $ formatMsg logLevel msg
       where
         formatMsg :: LogLevel -> T.Text -> T.Text
         formatMsg ll msg =

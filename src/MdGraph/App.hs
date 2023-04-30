@@ -28,5 +28,9 @@ newtype App a = App
   } deriving (Monad, Functor, Applicative, MonadReader Env, MonadIO, MonadError T.Text)
 
 data Env = Env
-  { config :: Config
-  }
+                                                { config :: Config
+                                                }
+
+instance HasConfig App where
+                                                getConfig = asks config
+

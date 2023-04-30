@@ -12,8 +12,9 @@ module MdGraph.Persist.Query
     , pruneDeletedDocuments
     , pruneUnchangedTempDocs
     , newFiles
-    , unreachable
-    , orphans
+    , unreachableM
+    , orphansM
+    , RunsQuery(..)
     , pruneModifiedDocs
     , nonexistant
     , forwardLinks
@@ -27,6 +28,7 @@ import           Control.Monad.Logger           ( NoLoggingT(..) )
 import           Control.Monad.Reader           ( MonadIO(liftIO)
                                                 , MonadReader(ask)
                                                 , ReaderT
+                                                , asks
                                                 , local
                                                 )
 import qualified Data.Map.Strict               as M
@@ -44,7 +46,21 @@ import           Database.Persist               ( Filter(..)
                                                 , insertMany
                                                 )
 import           Database.Persist.Sqlite        ( runSqlite )
+import           MdGraph.App                    ( App(App)
+                                                , Env(config)
+                                                )
+import           MdGraph.Config                 ( Config(dbConnString) )
 import           UnliftIO.Resource              ( ResourceT(..) )
+
+type Query a = ReaderT SqlBackend (NoLoggingT (ResourceT IO)) a
+
+class MonadIO m => RunsQuery m where
+  runQuery :: Query a -> m a
+
+instance RunsQuery App where
+    runQuery query = do
+        conn <- asks $ dbConnString . config
+        liftIO . runSqlite conn $ query
 
 insertEdges :: MonadIO m => Text -> [Edge] -> m [Key Edge]
 insertEdges connString edges = liftIO . runSqlite connString $ insertMany edges
@@ -150,8 +166,9 @@ pruneModifiedDocs connString = liftIO . runSqlite connString $ deleteCount $ do
             pure $ doc ^. DocumentPath
         )
 
--- Files with no incoming or outgoing edges
-orphans connString = liftIO . runSqlite connString $ select $ do
+-- | Files with no incoming or outgoing edges
+orphansM :: Query [Entity Document]
+orphansM = select $ do
     from
         $         from (table @Document)
         `except_` filesThatHaveLinks
@@ -167,17 +184,16 @@ filesThatHaveLinks = do
         \(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail
     pure file
 
--- Files with no incoming edges (but may have outgoing 
-unreachable connString =
-    liftIO
-        . runSqlite connString
-        $ select
+-- | Files with no incoming edges (but may have outgoing 
+unreachableM :: Query [Entity Document]
+unreachableM =
+    select
         $ do
               from
         $ (filesThatHaveLinks `except_` filesThatAreLinkedTo)
 
-backwardLinks :: MonadIO m => T.Text -> FilePath -> m [Entity Document]
-backwardLinks connString docPath = liftIO . runSqlite connString $ select $ do
+backwardLinks :: FilePath -> Query [Entity Document]
+backwardLinks docPath = select $ do
     (childDoc :& edge :& parentDoc) <-
         from
         $           table @Document
@@ -188,9 +204,9 @@ backwardLinks connString docPath = liftIO . runSqlite connString $ select $ do
     where_ (childDoc ^. DocumentPath ==. val docPath)
     pure parentDoc
 
-forwardLinks :: MonadIO m => T.Text -> FilePath -> m [Entity Document]
-forwardLinks connString docPath = do
-    documents <- liftIO . runSqlite connString $ select $ do
+forwardLinks :: FilePath -> Query [Entity Document]
+forwardLinks docPath = do
+    documents <- select $ do
         (parentDoc :& edge :& childDoc) <-
             from
             $           table @Document
@@ -206,7 +222,8 @@ forwardLinks connString docPath = do
 
 
 -- | Edges without associated files
-nonexistant connString = liftIO . runSqlite connString $ select $ do
+nonexistant :: Query [Entity Edge]
+nonexistant = select $ do
     (edge :& doc) <-
         from $ table @Edge `leftJoin` table @Document `on` \(edge :& doc) ->
             just (edge ^. EdgeTail) ==. doc ?. DocumentId

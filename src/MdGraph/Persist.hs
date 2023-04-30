@@ -12,7 +12,7 @@ import           Control.Monad.IO.Class         ( MonadIO(liftIO) )
 import qualified Data.Text                     as T
 import qualified Data.Text                     as T
 import           GHC.IO.Handle                  ( hIsWritable )
-import           MdGraph.File                   ( trueAbsolutePath )
+import           MdGraph.File.Internal          ( trueAbsolutePathIO )
 import qualified System.Directory              as D
 import           System.IO                      ( IOMode
                                                     ( ReadWriteMode
@@ -28,7 +28,7 @@ dbArgToConnString Temp = do
     return . Just $ T.pack path
 
 dbArgToConnString (DbFile path) = do
-    absPath <- T.pack <$> trueAbsolutePath (T.unpack path)
+    absPath <- T.pack <$> trueAbsolutePathIO (T.unpack path)
     -- TODO:
     -- If it's a new file, then attempt creating an empty file
     -- Check if file can be Read-Written

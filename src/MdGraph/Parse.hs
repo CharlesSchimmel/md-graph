@@ -16,7 +16,7 @@ import           Data.Text                     as T
 import           Data.Text.IO                  as T
                                                 ( readFile )
 import           MdGraph.App.LogLevel           ( LogLevel(Debug) )
-import           MdGraph.File                   ( fixLink )
+import           MdGraph.File.Internal          ( fixLink )
 import           Prelude                       as P
 import           System.Directory               ( doesFileExist
                                                 , getModificationTime

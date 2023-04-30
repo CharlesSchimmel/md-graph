@@ -11,14 +11,17 @@ import qualified Data.Text                     as T
 import           Debug.Trace                    ( trace )
 import           MdGraph.App.Arguments          ( Arguments(..) )
 import           MdGraph.App.LogLevel
-import           MdGraph.File                   ( maybeDirectory
-                                                , trueAbsolutePath
+import           MdGraph.File.Internal          ( maybeDirectory
+                                                , trueAbsolutePathIO
                                                 )
 import           MdGraph.Persist                ( dbArgToConnString )
 import           System.Directory               ( canonicalizePath
                                                 , doesDirectoryExist
                                                 )
 import           System.Posix                   ( directoryMode )
+
+class HasConfig m where
+  getConfig :: m Config
 
 data Config = Config
   { logLevel         :: LogLevel
@@ -39,7 +42,7 @@ argsToConfig args@Arguments {..} = do
 
   libraryPath :: ExceptT T.Text IO FilePath
   libraryPath = do
-    absoluteLibraryDir <- liftIO $ trueAbsolutePath argLibrary
+    absoluteLibraryDir <- liftIO $ trueAbsolutePathIO argLibrary
     liftIO (maybeDirectory absoluteLibraryDir)
       >>= maybe (throwError "Library directory does not exist") pure
 
