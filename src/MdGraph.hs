@@ -133,7 +133,6 @@ prepareDatabase = do
         . T.unwords
         $ ["Found", T.pack . show . P.length $ newEdges, "new edges"]
 
-    -- P.print newEdges
     logDebug "Inserting new edges"
     insertEdges newEdges
 
@@ -159,7 +158,7 @@ updateLinks results = do
             return result { links = resolvedLinks }
         tryResolveLink :: (Monad m, Files m) => Link -> m Link
         tryResolveLink link@Link { linkPath } = do
-            actualPath <- getAbsoluteDocumentPath linkPath
+            actualPath <- getQualifiedDocumentPath linkPath
             return $ link { linkPath = actualPath }
 
     P.mapM tryResolveDoc results

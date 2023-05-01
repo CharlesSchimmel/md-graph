@@ -54,7 +54,6 @@ data ParseResult = ParseResult
     }
     deriving Show
 
--- TODO: Pull out absolute path
 parseDocumentIO
     :: FilePath -> FilePath -> FilePath -> IO (Either ParseError ParseResult)
 parseDocumentIO defExt libraryPath file = do
@@ -75,5 +74,6 @@ instance Parses App where
     parseDocuments files = do
         defExt       <- defaultExtension <$> getConfig
         libPath      <- libraryPath <$> getConfig
-        parseResults <- liftIO $ mapM (parseDocumentIO defExt libPath) files
+        parseResults <- liftIO
+            $ mapConcurrently (parseDocumentIO defExt libPath) files
         return $ rights parseResults

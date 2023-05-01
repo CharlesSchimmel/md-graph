@@ -34,7 +34,8 @@ class Files m where
   maybePath :: FilePath -> m (Maybe FilePath)
   maybeFile :: FilePath -> m (Maybe FilePath)
   findDocuments :: m [File]
-  getAbsoluteDocumentPath :: FilePath -> m FilePath
+  -- | Fix the document path if it resolves with an extension
+  getQualifiedDocumentPath :: FilePath -> m FilePath
 
 instance Files App where
     trueAbsolutePath = liftIO . Internal.trueAbsolutePathIO
@@ -43,7 +44,8 @@ instance Files App where
     findDocuments    = do
         config@Config {..} <- getConfig
         liftIO $ Internal.findDocuments defaultExtension [libraryPath]
-    getAbsoluteDocumentPath path = do
+    getQualifiedDocumentPath path = do
         Config {..} <- getConfig
         let withExtension = path <.> defaultExtension
-        fromMaybe path <$> maybeFile (libraryPath </> withExtension)
+        maybeFullPathWithExtension <- maybeFile (libraryPath </> withExtension)
+        return $ maybe path (const withExtension) maybeFullPathWithExtension
