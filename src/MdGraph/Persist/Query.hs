@@ -22,6 +22,7 @@ module MdGraph.Persist.Query
 
 import           MdGraph.Persist.Schema
 
+import           Aux.Common                     ( batch )
 import           Control.Monad                  ( mapM )
 import           Control.Monad.Logger           ( NoLoggingT(..) )
 import           Control.Monad.Reader           ( MonadIO(liftIO)
@@ -31,6 +32,7 @@ import           Control.Monad.Reader           ( MonadIO(liftIO)
                                                 , local
                                                 )
 import           Data.Int                       ( Int64 )
+import qualified Data.List                     as List
 import qualified Data.Map.Strict               as M
 import           Data.Maybe                     ( catMaybes )
 import           Data.Text                      ( Text(..) )
@@ -64,7 +66,9 @@ insertTags tags = insertMany tags
 insertDocuments :: [Document] -> Query (M.Map (Key Document) Document)
 insertDocuments docs = do
     keys <- insertMany docs
-    getMany keys
+    let keyBatches = batch 500 keys
+    aoeu <- sequence (getMany <$> keyBatches)
+    return $ List.foldr M.union M.empty aoeu
 
 insertTempDocuments :: [TempDocument] -> Query [Key TempDocument]
 insertTempDocuments docs = do
