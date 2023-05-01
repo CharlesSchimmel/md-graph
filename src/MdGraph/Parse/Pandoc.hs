@@ -58,9 +58,8 @@ instance Semigroup PandocResult where
 instance Monoid PandocResult where
     mempty = PandocResult mempty mempty
 
--- TODO: Unhush this error
-sieveLinks :: Text -> Maybe PandocResult
-sieveLinks content = either (const Nothing) Just $ do
+sieveLinks :: Text -> Either PandocError PandocResult
+sieveLinks content = do
     mdLinks <- extractMarkdownLinks content
     vwLinks <- extractVimWikiLinks content
     tags    <- extractTags content

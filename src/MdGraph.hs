@@ -110,7 +110,6 @@ prepareDatabase = do
         docPathsToParse = M.keys docKeyMap
 
     logDebug "Parsing new and modified Documents"
-    -- TODO: Need to fix link targets, missing extensions
     parseResults   <- parseDocuments docPathsToParse
     updatedResults <- updateLinks parseResults
 
@@ -140,7 +139,7 @@ prepareDatabase = do
 
     logInfo
         . T.unwords
-        $ ["Found", T.pack . show . P.length $ newEdges, "new tags"]
+        $ ["Found", T.pack . show . P.length $ newTags, "new tags"]
     logDebug "Inserting new tags"
     insertTags newTags
 
