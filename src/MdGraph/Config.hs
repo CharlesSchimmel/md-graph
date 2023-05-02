@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData  #-}
 module MdGraph.Config where
 
 import           Aux.Common                     ( explain )
@@ -26,6 +27,7 @@ class HasConfig m where
 data Config = Config
   { logLevel         :: LogLevel
   , defaultExtension :: FilePath
+  -- | Absolute library path
   , libraryPath      :: FilePath
   , dbConnString     :: T.Text
   }

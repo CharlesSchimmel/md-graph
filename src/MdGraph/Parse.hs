@@ -30,7 +30,9 @@ import           MdGraph.Config                 ( Config
                                                     )
                                                 , HasConfig(getConfig)
                                                 )
-import           MdGraph.File.Internal          ( fixLink )
+import           MdGraph.File.Internal          ( AbsolutePath(AbsolutePath)
+                                                , fixLink
+                                                )
 import           MdGraph.Util                   ( mapLeft
                                                 , trace'
                                                 , trace''
@@ -48,32 +50,30 @@ data ParseError = FileNotFound | PandocFail PandocError
     deriving Show
 
 data ParseResult = ParseResult
-    { file  :: FilePath
+    { file  :: AbsolutePath
     , links :: [Link]
     , tags  :: [Tag]
     }
     deriving Show
 
-parseDocumentIO
-    :: FilePath -> FilePath -> FilePath -> IO (Either ParseError ParseResult)
-parseDocumentIO defExt libraryPath file = do
-    exists <- doesFileExist absFile
+parseDocumentIO :: AbsolutePath -> IO (Either ParseError ParseResult)
+parseDocumentIO absolutePath@(AbsolutePath filePath) = do
+    exists <- doesFileExist filePath
     if not exists
         then return . Left $ FileNotFound
         else do
-            fileContent <- T.readFile absFile
+            fileContent <- T.readFile filePath
             return . mapLeft PandocFail $ do
                 PandocResult { tags, links } <- sieveLinks fileContent
-                return $ ParseResult file (S.toList links) (S.toList tags)
-    where absFile = libraryPath </> file
+                return $ ParseResult absolutePath
+                                     (S.toList links)
+                                     (S.toList tags)
 
 class Parses m where
-  parseDocuments :: [FilePath] -> m [ParseResult]
+  parseDocuments :: [AbsolutePath] -> m [ParseResult]
 
 instance Parses App where
     parseDocuments files = do
-        defExt       <- defaultExtension <$> getConfig
         libPath      <- libraryPath <$> getConfig
-        parseResults <- liftIO
-            $ mapConcurrently (parseDocumentIO defExt libPath) files
+        parseResults <- liftIO $ mapConcurrently parseDocumentIO files
         return $ rights parseResults

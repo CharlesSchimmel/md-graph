@@ -12,12 +12,12 @@ class FromFile a where
   fromFile :: Dto.File -> a
 
 instance FromFile Document where
-    fromFile Dto.File { filePath, modificationTime } =
-        Document filePath modificationTime
+    fromFile Dto.File { relativePath, modificationTime } =
+        Document (Dto.unRelativePath relativePath) modificationTime
 
 instance FromFile TempDocument where
-    fromFile Dto.File { filePath, modificationTime } =
-        TempDocument filePath modificationTime
+    fromFile Dto.File { relativePath, modificationTime } =
+        TempDocument (Dto.unRelativePath relativePath) modificationTime
 
 class FromTempDocument a where
   fromTempDocument :: TempDocument -> a

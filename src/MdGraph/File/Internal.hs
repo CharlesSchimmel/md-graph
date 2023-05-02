@@ -1,3 +1,9 @@
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
+
 module MdGraph.File.Internal where
 
 import           Control.Applicative
@@ -8,46 +14,70 @@ import           Control.Monad.Reader           ( asks )
 import           Control.Monad.Trans.Maybe
 import           Data.Foldable
 import           Data.Hashable                  ( Hashable )
-import qualified Data.List
+import qualified Data.List                     as L
 import           Data.Maybe
 import           Data.Text                     as T
 import           Data.Time                      ( UTCTime )
 import           Data.Traversable              as T
+import           MdGraph.Util                   ( trace'' )
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
 
+-- | Paths relative to the library directory
+newtype RelativePath = RelativePath { unRelativePath :: FilePath }
+  deriving (Show, Ord, Eq)
+
+-- | Paths absolute to the filesystem
+newtype AbsolutePath = AbsolutePath { unAbsolutePath :: FilePath }
+  deriving (Show, Ord, Eq)
+
+class IsFile a where
+  unFile :: a -> FilePath
+
+data FileResult = FileResult
+  { resultPath    :: AbsolutePath
+  , resultModTime :: UTCTime
+  }
+  deriving (Show, Eq, Ord)
+
 data File = File
-  { filePath         :: FilePath -- | Relative to the library
+  { absolutePath     :: AbsolutePath
+  , relativePath     :: RelativePath
   , modificationTime :: UTCTime
   }
-  deriving (Show, Ord, Eq)
+  deriving (Show, Eq, Ord)
 
 doubleDot :: FilePath
 doubleDot = ".."
 
--- unsafe, need to switch to safe tail
--- does not support oddly placed parent-traversal like `foo/bar/baz/../file-in-bar.md`
--- | Given a source path and a destination path, make the destination path
--- relative to the source
+-- TODO? does not support oddly placed parent-traversal like `foo/bar/baz/../file-in-bar.md`
+--
+-- | If a destination path has parent directory traversal (../), flatten it
+-- with its source to remove the directory traversal
 reRelativize :: FilePath -> FilePath -> FilePath
-reRelativize source destination
+reRelativize sourceFile destination
   | not $ isRelative destination = destination
-  | otherwise = joinDir $ parentedSourceDirs ++ unrelativeDest
+  | otherwise                    = trueDest </> joinDir absoluteParts
  where
-  sourceParts = splitDirectories $ takeDirectory source
-  destParts = splitDirectories destination
-  pops = P.foldr -- todo: use normalise?
-                 (\cur acc -> if cur == doubleDot then P.tail . acc else acc)
-                 id
-                 destParts
-  parentedSourceDirs = pops sourceParts
-  unrelativeDest     = P.filter (/= doubleDot) destParts
+  sourceParts    = splitDirectories . takeDirectory $ sourceFile
+  destParts      = splitDirectories destination
+  isRelativePart = (== doubleDot)
+  -- | Just the double dots
+  relativeParts  = L.length . L.takeWhile isRelativePart $ destParts
+  -- | The actually useful parts of the destination path that aren't double
+  -- dots
+  absoluteParts  = L.dropWhile isRelativePart destParts
+  -- | The parts of the sourceFile path without the directories popped by the
+  -- destination's ../'s
+  trueDest =
+    joinDir $ L.reverse . L.drop relativeParts . L.reverse $ sourceParts
 
+-- TODO: why not joinPath?
 joinDir []    = ""
 joinDir paths = P.foldr1 (</>) paths
 
--- Figure out if a path exists relative to the file it came from. Check if a
+-- | Figure out if a path exists relative to the file it came from. Check if a
 -- path exists with extension, with reRelativization, with rerel and extension.
 fixLink :: FilePath -> FilePath -> FilePath -> IO FilePath
 fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
@@ -57,43 +87,60 @@ fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
       <|> (normalise <$> tryRerel source dest)
       <|> tryRerelExt defaultExtension source dest
 
+-- | Figure out if a path exists relative to the file it came from. Check if a
+-- path exists with extension, with reRelativization, with rerel and extension.
+fixLink_
+  :: Monad m
+  => (FilePath -> m Bool)
+  -> FilePath
+  -> FilePath
+  -> FilePath
+  -> m FilePath
+fixLink_ tester defaultExtension source dest = do
+  let destWithExtension = dest -<.> defaultExtension
+  destWithExtensionResult <- maybeTester tester destWithExtension
+  rereled                 <- maybeTester tester $ reRelativize source dest
+  rereledWithExtension    <- maybeTester tester
+    $ reRelativize source destWithExtension
+  return
+    .   fromMaybe dest
+    $   destWithExtensionResult
+    <|> rereled
+    <|> rereledWithExtension
+
+maybeTester :: Monad m => (a -> m Bool) -> a -> m (Maybe a)
+maybeTester tester a = do
+  test <- tester a
+  return $ if test then Just a else Nothing
+
 tryExt :: FilePath -> FilePath -> MaybeT IO FilePath
-tryExt defExt dest = MaybeT $ maybePath $ dest <.> defExt
+tryExt defExt dest = MaybeT $ maybeFile $ dest <.> defExt
 
 tryRerel :: FilePath -> FilePath -> MaybeT IO FilePath
-tryRerel source dest = MaybeT $ maybePath $ reRelativize source dest
+tryRerel source dest = MaybeT $ do
+  found <- maybeFile $ reRelativize source dest
+  return $ trace'' "tryrerel" found
 
 tryRerelExt :: FilePath -> FilePath -> FilePath -> MaybeT IO FilePath
 tryRerelExt defExt source dest =
-  MaybeT $ maybePath $ reRelativize source (dest <.> defExt)
-
-maybePath :: FilePath -> IO (Maybe FilePath)
-maybePath path = do
-  exists <- D.doesPathExist path
-  return $ if exists then Just path else Nothing
+  MaybeT $ maybeFile $ reRelativize source (dest <.> defExt)
 
 maybeFile :: FilePath -> IO (Maybe FilePath)
-maybeFile file = do
-  exists <- D.doesFileExist file
-  pure $ if exists then Just file else Nothing
+maybeFile file = maybeTester D.doesFileExist file
 
 maybeDirectory :: FilePath -> IO (Maybe FilePath)
-maybeDirectory dir = do
-  exists <- D.doesDirectoryExist dir
-  pure $ if exists then Just dir else Nothing
+maybeDirectory dir = maybeTester D.doesDirectoryExist dir
 
 -- | Find documents in library and return them with FilePaths relative to the
 -- library
 findDocuments
   :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [File]
 findDocuments defaultExt sourcePaths = do
-  documents <- deepFiles defaultExt sourcePaths
-  return $ normaliseDoc <$> documents
- where
-  normaliseDoc doc@File { filePath } = doc { filePath = normalise filePath }
+  join . catMaybes . toList <$> T.mapM (traverseDir defaultExt) sourcePaths
 
 data PathType = F FilePath | D FilePath deriving Show
 
+-- | Try to evaluate a path. If it exists, give its type.
 getPathType :: FilePath -> IO (Maybe PathType)
 getPathType path = do
   exists <- D.doesPathExist path
@@ -102,45 +149,33 @@ getPathType path = do
     then return Nothing
     else return . Just $ if isFile then F path else D path
 
+-- | Try to get get the filetree of a path. If the path does not exist, return
+-- Nothing.
 traverseDir :: FilePath -> FilePath -> IO (Maybe [File])
 traverseDir extension path = do
-  pathType <- getPathType path
-  T.sequence $ expand extension <$> pathType
+  pathType    <- getPathType path
+  fileResults <- T.sequence $ expand extension <$> pathType
+  return $ (fmap $ fmap (relativizeFile path)) fileResults
 
-expand :: FilePath -> PathType -> IO [File]
-expand extension path = go path
- where
-  go :: PathType -> IO [File]
-  go (F path) = if not . F.isExtensionOf extension $ path
-    then return []
-    else do
-      modAt <- getModificationTime path
-      return [File path modAt]
-  go p@(D path) = do
-    contents     <- fmap (path </>) <$> D.listDirectory path
-    contentTypes <- catMaybes <$> mapConcurrently getPathType contents
-    join <$> mapConcurrently go contentTypes
-
-deepFiles :: (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [File]
-deepFiles extension sourcePath = join . catMaybes . toList <$> T.forM
-  sourcePath
-  (\file -> do
-    result <- traverseDir extension file
-    let relativized = fmap (relativizeDocument file) <$> result
-    return relativized
-  )
+-- | Recursively explore _path_, and return files with _extension_
+expand :: FilePath -> PathType -> IO [FileResult]
+expand extension (F path) = if not . F.isExtensionOf extension $ path
+  then return []
+  else do
+    modAt <- getModificationTime path
+    return [FileResult (AbsolutePath path) modAt]
+expand extension (D path) = do
+  contents     <- fmap (path </>) <$> D.listDirectory path
+  contentTypes <- catMaybes <$> mapConcurrently getPathType contents
+  join <$> mapConcurrently (expand extension) contentTypes
 
 -- TODO: probably need to only accept a single library dir instead of multiple
 -- or we could run into filepath collisions.
 
-relativizeDocument :: FilePath -> File -> File
-relativizeDocument baseDir doc@File { filePath } =
-  doc { filePath = makeRelative baseDir filePath }
-
 -- | canonicalize path and also convert tilde home directory reference to actual
 trueAbsolutePathIO :: FilePath -> IO FilePath
 trueAbsolutePathIO path = do
-  detilde path >>= canonicalizePath
+  detilde path >>= makeAbsolute
 
 detilde :: FilePath -> IO FilePath
 detilde path = do
@@ -151,3 +186,14 @@ detilde path = do
   rejoin homePath []                 = ""
   rejoin homePath ("~/" : pathParts) = joinPath (homePath : pathParts)
   rejoin _        pathParts          = joinPath pathParts
+
+relativizeFile :: FilePath -> FileResult -> File
+relativizeFile basePath file@FileResult { resultPath, resultModTime } = File
+  { absolutePath     = resultPath
+  , relativePath     = makeRelativePath basePath resultPath
+  , modificationTime = resultModTime
+  }
+
+makeRelativePath :: FilePath -> AbsolutePath -> RelativePath
+makeRelativePath basePath (AbsolutePath aPath) =
+  RelativePath $ makeRelative basePath aPath
