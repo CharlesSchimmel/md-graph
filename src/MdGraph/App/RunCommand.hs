@@ -40,7 +40,6 @@ import           MdGraph.Persist.Query         as Q
 import           MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema        as Edge
                                                 ( Edge(..) )
-import           MdGraph.Util                   ( trace'' )
 import           System.Directory               ( canonicalizePath )
 import           System.FilePath                ( makeRelative )
 

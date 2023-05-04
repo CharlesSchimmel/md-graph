@@ -21,7 +21,6 @@ import           Data.Text                     as T
 import           Data.Time                      ( UTCTime )
 import           Data.Traversable              as T
 import           GHC.Generics                   ( Generic )
-import           MdGraph.Util                   ( trace'' )
 import           Prelude                       as P
 import           System.Directory              as D
 import           System.FilePath               as F
@@ -123,9 +122,7 @@ tryExt :: FilePath -> FilePath -> MaybeT IO FilePath
 tryExt defExt dest = MaybeT $ maybeFile $ dest <.> defExt
 
 tryRerel :: FilePath -> FilePath -> MaybeT IO FilePath
-tryRerel source dest = MaybeT $ do
-  found <- maybeFile $ reRelativize source dest
-  return $ trace'' "tryrerel" found
+tryRerel source dest = MaybeT $ maybeFile $ reRelativize source dest
 
 tryRerelExt :: FilePath -> FilePath -> FilePath -> MaybeT IO FilePath
 tryRerelExt defExt source dest =

@@ -8,7 +8,6 @@ import           Data.Text.IO                  as Tio
 import           Prelude                 hiding ( log )
 
 import           Control.Monad.Reader           ( asks )
-import           Debug.Trace                    ( trace )
 import           MdGraph.App                    ( App(..)
                                                 , Env(..)
                                                 )

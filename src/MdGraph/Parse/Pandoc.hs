@@ -11,9 +11,7 @@ import           Data.Maybe                     ( catMaybes
                                                 , fromMaybe
                                                 )
 import           Data.Text                     as T
-import           Debug.Trace                    ( trace )
 import           MdGraph.Node
-import           MdGraph.Util                   ( trace' )
 import qualified Network.URI                   as URI
                                                 ( unEscapeString )
 import           Prelude                       as P

@@ -9,7 +9,6 @@ import qualified Data.Text                     as T
                                                 , pack
                                                 , unwords
                                                 )
-import           Debug.Trace                    ( trace )
 import           MdGraph.App.Arguments          ( Arguments(..) )
 import           MdGraph.App.LogLevel
 import           MdGraph.File.Internal          ( maybeDirectory

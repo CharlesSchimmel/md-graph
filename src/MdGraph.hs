@@ -57,13 +57,11 @@ import qualified Data.Text.IO                  as T
 import           Database.Persist.Sqlite        ( Entity(entityVal)
                                                 , runSqlite
                                                 )
-import           Debug.Trace                    ( trace )
 import           MdGraph.App.Command            ( Command )
 import           MdGraph.App.RunCommand         ( runCommand )
 import           MdGraph.Node                   ( Link(..) )
 import           MdGraph.Node                  as Node
 import           MdGraph.Persist.Class          ( PreparesDb(..) )
-import           MdGraph.Util                   ( trace'' )
 import           Options.Applicative
 import           Prelude
 import           Prelude                       as P

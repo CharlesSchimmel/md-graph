@@ -29,7 +29,6 @@ import           MdGraph.Config                 ( Config(..)
                                                 )
 import qualified MdGraph.File.Internal         as Internal
 import           MdGraph.File.Internal          ( File(..) )
-import           MdGraph.Util                   ( trace' )
 
 class Files m where
   trueAbsolutePath :: FilePath -> m FilePath
@@ -53,6 +52,6 @@ instance Files App where
     getQualifiedDocumentPath path = do
         Config {..} <- getConfig
         -- what about subdirs
-        let withExtension = trace' $ path <.> defaultExtension
+        let withExtension = path <.> defaultExtension
         maybeFullPathWithExtension <- maybeFile (libraryPath </> withExtension)
         return $ maybe path (const withExtension) maybeFullPathWithExtension

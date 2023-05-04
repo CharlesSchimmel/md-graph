@@ -8,6 +8,7 @@ module MdGraph.Parse
 import           MdGraph.Node
 import           MdGraph.Parse.Pandoc
 
+import           Aux.Either                     ( mapLeft )
 import           Control.Concurrent.Async       ( mapConcurrently )
 import           Control.Monad.IO.Class         ( MonadIO(liftIO) )
 import           Data.Either                    ( partitionEithers
@@ -32,10 +33,6 @@ import           MdGraph.Config                 ( Config
                                                 )
 import           MdGraph.File.Internal          ( AbsolutePath(AbsolutePath)
                                                 , fixLink
-                                                )
-import           MdGraph.Util                   ( mapLeft
-                                                , trace'
-                                                , trace''
                                                 )
 import           Prelude                       as P
 import           System.Directory               ( doesFileExist
