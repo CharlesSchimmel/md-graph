@@ -1,4 +1,6 @@
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 module MdGraph where
 
 import           Aux.Map                       as M
@@ -10,7 +12,7 @@ import           MdGraph.File                   ( Files(..) )
 import           MdGraph.File.Internal          ( AbsolutePath(..)
                                                 , File(..)
                                                 , RelativePath(..)
-                                                , fixLink_
+                                                , smartRelativizePath
                                                 )
 import           MdGraph.Parse                  ( ParseResult(..)
                                                 , Parses(..)
@@ -18,19 +20,26 @@ import           MdGraph.Parse                  ( ParseResult(..)
 import           MdGraph.Persist.Mapper        as Mapper
 import           MdGraph.Persist.Schema         ( Document(documentPath)
                                                 , Edge(..)
-                                                , Tag(..)
+                                                , Key(..)
                                                 , TempDocument(tempDocumentPath)
                                                 , migrateAll
                                                 , migrateMdGraph
                                                 )
 
+import           Aux.Tuple                      ( mapSnd
+                                                , mapToSnd
+                                                , mapToSndM
+                                                )
 import           Control.Concurrent.Async       ( mapConcurrently )
-import           Control.Monad                  ( forM )
+import           Control.Monad                  ( forM
+                                                , join
+                                                )
 import           Control.Monad.IO.Class         ( MonadIO(liftIO) )
 import           Control.Monad.Identity         ( Identity(..) )
 import           Control.Monad.Reader           ( MonadReader(ask)
                                                 , asks
                                                 )
+import           Data.Either                    ( rights )
 import           Data.Foldable                 as F
                                                 ( mapM_ )
 import           Data.HashSet                  as S
@@ -50,6 +59,7 @@ import           Debug.Trace                    ( trace )
 import           MdGraph.App.Command            ( Command )
 import           MdGraph.App.RunCommand         ( runCommand )
 import           MdGraph.Node                   ( Link(..) )
+import           MdGraph.Node                  as Node
 import           MdGraph.Persist.Class          ( PreparesDb(..) )
 import           MdGraph.Util                   ( trace'' )
 import           Options.Applicative
@@ -64,6 +74,7 @@ import           Prelude                       as P
                                                 )
 import           System.FilePath                ( (<.>)
                                                 , (</>)
+                                                , makeRelative
                                                 )
 
 mdGraph :: Command -> App ()
@@ -81,16 +92,15 @@ mdGraph command = do
 prepareDatabase
     :: (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m) => m ()
 prepareDatabase = do
-    Config { defaultExtension } <- getConfig
+    Config { defaultExtension, libraryPath } <- getConfig
     logDebug "Preparing database"
     migrate
 
     -- find documents
     logDebug "Finding documents"
     docs <- findDocuments
-    let totalCt        = P.length docs
-        relativeDocMap = M.fromList' relativePath docs
-        absoluteDocMap = M.fromList' absolutePath docs
+    let totalCt         = P.length docs
+        relativeFileMap = M.fromList' relativePath docs
 
     -- load all found documents into temp
     logDebug "Populating TempDocuments"
@@ -121,38 +131,65 @@ prepareDatabase = do
 
     let docKeyMap       = M.flop (RelativePath . documentPath) newDocs
         docPathsToParse = M.keys docKeyMap
-        filesToParse    = catMaybes $ (M.!?) relativeDocMap <$> docPathsToParse
+        filesToParse    = catMaybes $ (M.!?) relativeFileMap <$> docPathsToParse
+        filesAndDocumentToParse =
+            catMaybes
+                $   (\doc ->
+                        (, doc)
+                            <$>  relativeFileMap
+                            M.!? (RelativePath . documentPath $ doc)
+                    )
+                <$> M.elems newDocs
         absPathsToParse = absolutePath <$> filesToParse
 
     logDebug "Parsing new and modified Documents"
     logDebug . T.pack . show $ docPathsToParse
-    parseResults <- parseDocuments absPathsToParse
+
+    rawParseResults <- mapToSndM (parseDocument . absolutePath . fst)
+                                 filesAndDocumentToParse
+    let resequencedResults = P.map
+            (\((file, document), eith) -> (file, document, ) <$> eith)
+            rawParseResults
+    let postParseCtxs =
+            (\(file, document, ParseResult { tags, links }) -> PostParseCtx
+                    { ppcDocument = document
+                    , ppcFile     = file
+                    , ppcTag      = tags
+                    , ppcLinks    = links
+                    }
+                )
+                <$> rights resequencedResults
+    let fileInsideEither =
+            (\(file, eith) -> (file, ) <$> eith) <$> rawParseResults
+
+    -- -- TODO: Log out parse failures
+    let parseResults   = rights fileInsideEither
+    -- parseResults <- parseDocuments absPathsToParse
+
+    -- Make links relative to file
 
     -- Take the parseResults and try to rerelativize their links
     -- updatedResults <- updateLinks parseResults
-    let knownPaths = S.fromList $ unAbsolutePath . absolutePath <$> docs
-    -- The links have absolute paths to the real files (if they exist)
-    let resultsWithAbsoluteLinks =
-            rerelParseResult knownPaths defaultExtension <$> parseResults
--- The links have paths relative to the library
-        resultsWithRelativeLinks =
-            updateResultLinks absoluteDocMap <$> resultsWithAbsoluteLinks
+    let knownRealPaths = S.fromList $ absolutePath <$> docs
 
-    let resultMap = M.fromList' file resultsWithRelativeLinks
-        pathToKeyResult =
-            P.map snd . M.toList $ M.unionWith' docKeyMap relativeDocMap
-        newTagsAndEdges :: [([Tag], [Edge])]
-        newTagsAndEdges = P.map
-            (\(docKey, result) ->
-                (fromParseResult docKey result, fromParseResult docKey result)
-            )
-            pathToKeyResult
-        (newTags, newEdges) = P.foldr
-            (\(accTags, accEdges) (tags, edges) ->
-                (accTags ++ tags, accEdges ++ edges)
-            )
-            ([], [])
-            newTagsAndEdges
+    -- The links have absolute paths to the real files (if the link resolves)
+    let fileAndItsAbsoluteLinks =
+            fmap (mkAbsoluteLinks knownRealPaths defaultExtension)
+                <$> parseResults
+    let fileAndLinks =
+            fileAndItsAbsoluteLinks >>= (\(file, links) -> (file, ) <$> links)
+
+    -- The links have paths relative to their file
+    let relativeLinksAndFiles =
+            fmap (mkRelativeLinks libraryPath) <$> fileAndLinks
+    let relLinksAndDocKey =
+            catMaybes
+                $   (\(file, link) ->
+                        (, link) <$> (docKeyMap M.!? relativePath file)
+                    )
+                <$> relativeLinksAndFiles
+
+    let newEdges = uncurry Mapper.toEdge <$> relLinksAndDocKey
 
     logInfo
         . T.unwords
@@ -173,52 +210,68 @@ reportDocumentCount num reason = do
     logInfo . T.unwords $ [T.pack . show $ num, reason]
     pure ()
 
--- | Update links to include the extension if they were defined without one,
--- and their link-path.md resolves to a real file
-updateLinks
-    :: forall m . (Monad m, Files m) => [ParseResult] -> m [ParseResult]
-updateLinks results = do
-    let tryResolveDoc result@ParseResult { file, links } = do
-            resolvedLinks <- mapM (tryResolveLink file) links
-            return result { links = resolvedLinks }
-        tryResolveLink :: (Monad m, Files m) => FilePath -> Link -> m Link
-        tryResolveLink sourceFile link@Link { linkPath } = do
-            actualPath <- relativizeWithExtension sourceFile linkPath
-            return $ link { linkPath = trace'' "actual path " actualPath }
+mkPostParseTag :: File -> Node.Tag -> PostParseTag
+mkPostParseTag File { relativePath } tag@Node.Tag { tagLabel } =
+    PostParseTag { taggedFile = relativePath, tagLabel = tagLabel }
 
-    P.mapM tryResolveDoc results
+-- | For a ParseResult, try to rerelativize its Links relative to the parsed
+-- file's absolute path
+mkAbsoluteLinks
+    :: S.HashSet AbsolutePath -> FilePath -> ParseResult -> [AbsoluteLink]
+mkAbsoluteLinks knownPaths defaultExtension result@ParseResult { links, file }
+    = AbsoluteLink <$> newLinks
+  where
+    newLinks = rerelativizeLink knownPaths defaultExtension file <$> links
+
+mkRelativeLinks :: FilePath -> AbsoluteLink -> RelativeLink
+mkRelativeLinks libraryPath (AbsoluteLink link@Link { linkPath, linkText }) =
+    RelativeLink $ Link { linkText = linkText
+                        , linkPath = makeRelative libraryPath linkPath
+                        }
 
 -- Take the list of known files
 -- Take the parsed links
 -- Try rerelativising the parsed links, and if that new link is in known files, update it.
-newUpdateLink :: S.HashSet FilePath -> FilePath -> FilePath -> Link -> Link
-newUpdateLink knownPaths defaultExtension sourcePath link@Link { linkPath } =
-    link { linkPath = newPath }
+-- | Using a set of known real files, check if the Link's path can be coerced
+-- into matching one of those real file paths
+rerelativizeLink
+    :: S.HashSet AbsolutePath -> FilePath -> AbsolutePath -> Link -> Link
+rerelativizeLink knownPaths defaultExtension (AbsolutePath sourcePath) link@Link { linkPath }
+    = link { linkPath = newPath }
   where
-    newPath = runIdentity $ fixLink_
-        (\f -> Identity $ S.member f knownPaths)
+    newPath = runIdentity $ smartRelativizePath
+        (\f -> Identity $ S.member f (unAbsolutePath <$> knownPaths))
         defaultExtension
         sourcePath
         linkPath
 
--- | Update Link paths to be relative to the source file
--- This could maybe attach the File not Just check existance
-rerelParseResult
-    :: S.HashSet FilePath -> FilePath -> ParseResult -> ParseResult
-rerelParseResult knownPaths defaultExtension result@ParseResult { links, file }
-    = result { links = newLinks }
+-- | Forach link in a ParseResult, Lookup the link's (Absolute) path in the map
+-- to find its associated File, then update the Link's path with the File's
+-- relative path
+updateResultsWithActualRelativeLinks
+    :: M.Map AbsolutePath File -> ParseResult -> ParseResult
+updateResultsWithActualRelativeLinks map result@ParseResult { links } = result
+    { links = getRelativePathForLink map <$> links
+    }
   where
-    newLinks =
-        newUpdateLink knownPaths defaultExtension (unAbsolutePath file)
-            <$> links
+    -- | Lookup the link's (Absolute) path in the map, and if found, 
+    getRelativePathForLink :: M.Map AbsolutePath File -> Link -> Link
+    getRelativePathForLink map link@Link { linkPath } = maybe
+        link
+        (\file -> link { linkPath = unRelativePath $ relativePath file })
+        found
+        where found = map M.!? AbsolutePath linkPath
 
-updateLink' :: M.Map AbsolutePath File -> Link -> Link
-updateLink' map link@Link { linkPath } = maybe
-    link
-    (\file -> link { linkPath = unRelativePath $ relativePath file })
-    found
-    where found = map M.!? AbsolutePath linkPath
 
-updateResultLinks :: M.Map AbsolutePath File -> ParseResult -> ParseResult
-updateResultLinks map result@ParseResult { links } =
-    result { links = updateLink' map <$> links }
+data PostParseTag = PostParseTag
+    { taggedFile :: RelativePath
+    , tagLabel   :: T.Text
+    }
+
+data PostParseCtx = PostParseCtx
+    { ppcFile     :: File
+    , ppcDocument :: Document
+    , ppcLinks    :: [Link]
+    , ppcTag      :: [Tag]
+    }
+    deriving Show

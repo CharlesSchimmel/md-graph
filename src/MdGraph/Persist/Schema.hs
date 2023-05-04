@@ -75,3 +75,4 @@ type Query a = ReaderT SqlBackend (NoLoggingT (ResourceT IO)) a
 
 migrateMdGraph :: Query [Text]
 migrateMdGraph = runMigrationQuiet migrateAll
+

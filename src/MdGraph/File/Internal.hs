@@ -89,14 +89,14 @@ fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
 
 -- | Figure out if a path exists relative to the file it came from. Check if a
 -- path exists with extension, with reRelativization, with rerel and extension.
-fixLink_
+smartRelativizePath
   :: Monad m
   => (FilePath -> m Bool)
   -> FilePath
   -> FilePath
   -> FilePath
   -> m FilePath
-fixLink_ tester defaultExtension source dest = do
+smartRelativizePath tester defaultExtension source dest = do
   let destWithExtension = dest -<.> defaultExtension
   destWithExtensionResult <- maybeTester tester destWithExtension
   rereled                 <- maybeTester tester $ reRelativize source dest

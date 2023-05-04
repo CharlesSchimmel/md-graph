@@ -70,10 +70,12 @@ parseDocumentIO absolutePath@(AbsolutePath filePath) = do
                                      (S.toList tags)
 
 class Parses m where
+  parseDocument :: AbsolutePath -> m (Either ParseError ParseResult)
   parseDocuments :: [AbsolutePath] -> m [ParseResult]
 
 instance Parses App where
+    parseDocument file = do
+        liftIO $ parseDocumentIO file
     parseDocuments files = do
-        libPath      <- libraryPath <$> getConfig
         parseResults <- liftIO $ mapConcurrently parseDocumentIO files
         return $ rights parseResults

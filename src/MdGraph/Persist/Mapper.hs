@@ -4,7 +4,9 @@ module MdGraph.Persist.Mapper where
 import qualified Data.Text                     as T
 import           Data.Traversable               ( for )
 import qualified MdGraph.File.Internal         as Dto
+import           MdGraph.File.Internal          ( RelativePath(..) )
 import qualified MdGraph.Node                  as Node
+import           MdGraph.Node                   ( RelativeLink(RelativeLink) )
 import           MdGraph.Parse                  ( ParseResult(..) )
 import           MdGraph.Persist.Schema
 
@@ -47,3 +49,13 @@ fromNodeLink docKey Node.Link { linkPath, linkText } = Edge
     , edgeHead  = linkPath
     , edgeLabel = T.unpack linkText
     }
+
+class ToEdge a where
+  toEdge :: Key Document -> a -> Edge
+
+instance ToEdge RelativeLink where
+    toEdge docKey (RelativeLink Node.Link { linkPath, linkText }) = Edge
+        { edgeTail  = docKey
+        , edgeHead  = linkPath
+        , edgeLabel = T.unpack linkText
+        }

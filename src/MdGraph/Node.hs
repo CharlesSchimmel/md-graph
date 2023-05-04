@@ -21,3 +21,12 @@ data Tag = Tag
     deriving (Eq, Generic, Show)
 
 instance Hashable Tag
+
+-- | A link with an absolute filepath
+newtype AbsoluteLink = AbsoluteLink { unAbsoluteLink :: Link }
+    deriving Show
+
+-- | A link with a filepath relative to the library
+newtype RelativeLink = RelativeLink { unRelativeLink :: Link }
+    deriving Show
+
