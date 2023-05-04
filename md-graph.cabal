@@ -4,16 +4,16 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: eb50a912764be8b2965d42565229b97fda51b0843bf61ac4ca6e0327a84fe574
+-- hash: 86b3da1ba0789aedf8fe5e1cff7ce6e7c77e28a22c10aa10f70e6d33b896aef2
 
 name:           md-graph
-version:        0.1.0.0
+version:        2.0.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/md-graph#readme>
-homepage:       https://github.com/githubuser/md-graph#readme
-bug-reports:    https://github.com/githubuser/md-graph/issues
-author:         Author name here
+homepage:       https://github.com/charlesschimmel/md-graph#readme
+bug-reports:    https://github.com/charlesschimmel/md-graph/issues
+author:         Charles Schimmelpfennig
 maintainer:     example@example.com
-copyright:      2021 Author name here
+copyright:      2023 Charles Schimmelpfennig
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -23,7 +23,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/md-graph
+  location: https://github.com/charlesschimmel/md-graph
 
 library
   exposed-modules:
