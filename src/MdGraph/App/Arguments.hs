@@ -89,7 +89,7 @@ parseDatabase = parseToDbArg <$> optional
     (strOption
         (  long "database"
         <> short 'd'
-        <> help "Sqlite database to be used"
+        <> help "Sqlite database to use"
         <> metavar "DB"
         )
     )
@@ -197,7 +197,7 @@ parseLogLevel =
         <> help "Modify the logging level"
         <> short 'v'
         <> metavar "DEBUG|INFO|ERROR|NONE"
-        <> value Info
+        <> value LogLevel.None
         <> showDefault
   where
     readVerbosity :: ReadM LogLevel

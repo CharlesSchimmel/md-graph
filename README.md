@@ -20,7 +20,8 @@ Usage: md-graph [(-l|--library FILE|DIR)] [-d|--default-ext EXT] COMMAND
 Available options:
   -h,--help                Show this help text
   -l,--library FILE|DIR    Files or directories to parse
-  -d,--default-ext EXT     Default extension to use for files linked without
+  -d,--database FILE       Sqlite database file to use
+  -x,--default-ext EXT     Default extension to use for files linked without
                            extension (default: "md")
 
 Available commands:
@@ -30,10 +31,13 @@ Available commands:
   orphans                  Files without any links
   nonexistant              Links that cannot be resolved
   static                   Links that can be resolved but are not notes
+  populate                 Just populate the database
 ```
 - `-l, --library` Optional, defaults to the current working directory. The 
     folders or files to include in the graph. Folders will be recursively 
     searched.
+- `-d, --database` Optional, defaults to creating a temporary `mdgraphXXXX` 
+    file.
 - `-d, --default-extension` Default `md`. Extension to use for 
     links that do not specify an extension (like WikiLinks and VimWiki markdown 
     links)
