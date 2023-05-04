@@ -1,3 +1,5 @@
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE RankNTypes #-}
 
 module MdGraph.App where
 
@@ -9,14 +11,26 @@ import           Control.Monad.Reader           ( MonadReader
                                                 , ReaderT
                                                 , asks
                                                 )
-import           Data.Text
+import qualified Data.Text                     as T
+                                                ( Text(..)
+                                                , pack
+                                                , unwords
+                                                )
+import           Data.Text.IO                  as Tio
+import           Database.Persist.SqlBackend    ( SqlBackend )
+
+import           Control.Monad.Trans.Resource   ( MonadUnliftIO(..) )
+import           MdGraph.Config
+
 
 newtype App a = App
-  { runApp :: ReaderT Env (ExceptT Text IO) a
-  } deriving (Monad, Functor, Applicative, MonadReader Env, MonadIO, MonadError Text)
+  { runApp :: ReaderT Env (ExceptT T.Text IO) a
+  } deriving (Monad, Functor, Applicative, MonadReader Env, MonadIO, MonadError T.Text)
 
 data Env = Env
-    { config :: Config
-    }
+                                                { config :: Config
+                                                }
 
-data Config = Config
+instance HasConfig App where
+                                                getConfig = asks config
+

@@ -1,10 +1,10 @@
 name:                md-graph
-version:             0.1.0.0
-github:              "githubuser/md-graph"
+version:             2.0.0.0
+github:              "charlesschimmel/md-graph"
 license:             BSD3
-author:              "Author name here"
+author:              "Charles Schimmelpfennig"
 maintainer:          "example@example.com"
-copyright:           "2021 Author name here"
+copyright:           "2023 Charles Schimmelpfennig"
 
 extra-source-files:
 - README.md
@@ -24,11 +24,14 @@ default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, Flexible
 dependencies:
 - base >= 4.7 && < 5
 - async
+- containers
 - cryptohash-md5
 - directory
+- esqueleto
 - filepath
 - hashable
 - hashable-time
+- monad-logger
 - mtl
 - network-uri
 - optparse-applicative
@@ -37,9 +40,11 @@ dependencies:
 - persistent
 - persistent-sqlite
 - persistent-template
+- resourcet
 - text
 - time
 - transformers
+- unix
 - unordered-containers
 
 library:

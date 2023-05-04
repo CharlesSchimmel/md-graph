@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 64780d87b4002691413a3a1123b337dccce74211bd9285a2e5d51dded3c8ad2d
+-- hash: eb50a912764be8b2965d42565229b97fda51b0843bf61ac4ca6e0327a84fe574
 
 name:           md-graph
 version:        0.1.0.0
@@ -27,19 +27,33 @@ source-repository head
 
 library
   exposed-modules:
+      Aux.Common
+      Aux.HashMap
       Aux.HashSet
+      Aux.Map
       Aux.Tuple
       MdGraph
       MdGraph.App
       MdGraph.App.Arguments
       MdGraph.App.Command
+      MdGraph.App.Logger
+      MdGraph.App.LogLevel
+      MdGraph.App.RunCommand
+      MdGraph.Config
       MdGraph.File
-      MdGraph.Graph
+      MdGraph.File.Internal
       MdGraph.Node
       MdGraph.Parse
       MdGraph.Parse.Pandoc
+      MdGraph.Persist
+      MdGraph.Persist.Class
+      MdGraph.Persist.Graph
+      MdGraph.Persist.Mapper
+      MdGraph.Persist.Query
       MdGraph.Persist.Schema
       MdGraph.TagDirection
+      MdGraph.Types
+      MdGraph.Util
   other-modules:
       Paths_md_graph
   hs-source-dirs:
@@ -49,11 +63,14 @@ library
   build-depends:
       async
     , base >=4.7 && <5
+    , containers
     , cryptohash-md5
     , directory
+    , esqueleto
     , filepath
     , hashable
     , hashable-time
+    , monad-logger
     , mtl
     , network-uri
     , optparse-applicative
@@ -62,9 +79,11 @@ library
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
     , text
     , time
     , transformers
+    , unix
     , unordered-containers
   default-language: Haskell2010
 
@@ -80,12 +99,15 @@ executable md-graph
   build-depends:
       async
     , base >=4.7 && <5
+    , containers
     , cryptohash-md5
     , directory
+    , esqueleto
     , filepath
     , hashable
     , hashable-time
     , md-graph
+    , monad-logger
     , mtl
     , network-uri
     , optparse-applicative
@@ -94,9 +116,11 @@ executable md-graph
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
     , text
     , time
     , transformers
+    , unix
     , unordered-containers
   default-language: Haskell2010
 
@@ -113,12 +137,15 @@ test-suite md-graph-test
   build-depends:
       async
     , base >=4.7 && <5
+    , containers
     , cryptohash-md5
     , directory
+    , esqueleto
     , filepath
     , hashable
     , hashable-time
     , md-graph
+    , monad-logger
     , mtl
     , network-uri
     , optparse-applicative
@@ -127,8 +154,10 @@ test-suite md-graph-test
     , persistent
     , persistent-sqlite
     , persistent-template
+    , resourcet
     , text
     , time
     , transformers
+    , unix
     , unordered-containers
   default-language: Haskell2010

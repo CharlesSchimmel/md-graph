@@ -1,14 +1,17 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE ApplicativeDo #-}
 
 module MdGraph.App.Arguments
     ( Arguments(..)
-    , opts
+    , DatabaseArg(..)
+    , cliArguments
     ) where
 
 import           MdGraph.App.Command
-import           MdGraph.File
+import           MdGraph.App.LogLevel          as LogLevel
 import           MdGraph.Node
-import           MdGraph.TagDirection as TagDirection
+import           MdGraph.TagDirection          as TagDirection
 
 import           Data.Char                     as C
                                                 ( toLower )
@@ -22,12 +25,34 @@ import           System.Directory              as D
 import           System.FilePath               as F
 
 
+data DatabaseArg = Temp | DbFile { dbFile :: Text }
+    deriving Show
+
 data Arguments = Arguments
-    { argLibrary :: [FilePath]
-    , argDefExt  :: FilePath
-    , argCommand :: Command
+    { argLibrary  :: FilePath
+    , argDefExt   :: FilePath
+    , argDatabase :: DatabaseArg
+    , argLogLevel :: LogLevel
+    , argCommand  :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
     }
     deriving Show
+
+cliArguments :: IO Arguments
+cliArguments =
+    customExecParser (prefs disambiguate)
+        $  info (helper <*> parseArguments)
+        $  fullDesc
+        <> header
+               "md-graph - A utility for graph operations on a collection of markdown files"
+
+parseArguments :: Parser Arguments
+parseArguments =
+    Arguments
+        <$> parseLibrary
+        <*> parseDefaultExt
+        <*> parseDatabase
+        <*> parseLogLevel
+        <*> parseCommand
 
 parseCommand :: Parser Command
 parseCommand = hsubparser
@@ -38,7 +63,7 @@ parseCommand = hsubparser
           )
     <> command
            "backlinks"
-           ( info (Backlinks <$> (parseBacklinkOptions <*> parseDepth 1))
+           ( info (Backlinks <$> (parseBacklinkOptions <*> parseDepth 2))
            $ progDesc "The backlinks (reverse subgraph) of a node"
            )
     <> command
@@ -54,37 +79,40 @@ parseCommand = hsubparser
            ( info (pure Statics)
            $ progDesc "Links that can be resolved but are not notes"
            )
+    <> command
+           "populate"
+           (info (pure Populate) $ progDesc "Just populate the database")
     )
 
-opts :: IO Arguments
-opts =
-    customExecParser (prefs disambiguate)
-        $  info (helper <*> parseArguments)
-        $  fullDesc
-        <> header
-               "md-graph - A utility for graph operations on a collection of markdown files"
+parseDatabase :: Parser DatabaseArg
+parseDatabase = parseToDbArg <$> optional
+    (strOption
+        (  long "database"
+        <> short 'd'
+        <> help "Sqlite database to use"
+        <> metavar "DB"
+        )
+    )
+  where
+    parseToDbArg :: Maybe String -> DatabaseArg
+    parseToDbArg = maybe Temp (DbFile . T.pack)
 
-parseArguments :: Parser Arguments
-parseArguments =
-    Arguments <$> parseLibrary <*> parseDefaultExt <*> parseCommand
 
-parseLibrary :: Parser [FilePath]
-parseLibrary =
-    fromMaybe (["./"])
-        <$> (optional $ some
-                (strOption
-                    (  long "library"
-                    <> short 'l'
-                    <> help "Files or directories to parse"
-                    <> metavar "FILE|DIR"
-                    )
-                )
-            )
+parseLibrary :: Parser FilePath
+parseLibrary = strOption
+    (  long "library"
+    <> short 'l'
+    <> help "Directory to search"
+    <> metavar "FILE|DIR"
+    <> value "./"
+    <> showDefault
+    )
+
 
 parseDefaultExt :: Parser FilePath
 parseDefaultExt = P.dropWhile (== '.') <$> strOption
     (  long "default-ext"
-    <> short 'd'
+    <> short 'x'
     <> help "Default extension to use for files linked without extension"
     <> showDefault
     <> value "md"
@@ -109,7 +137,7 @@ parseDepth def =
         <> showDefault
         <> value def
 
-parseSubgraphTargets :: Parser [Node]
+parseSubgraphTargets :: Parser [SubgraphTarget]
 parseSubgraphTargets = some $ argument
     readNode
     (metavar "NODES" <> help "Nodes (files or #tags) to process")
@@ -138,10 +166,10 @@ readCaseInsensitiveBool = maybeReader . asLower $ \case
     "false" -> Just False
     _       -> Nothing
 
-readNode :: ReadM Node
+readNode :: ReadM SubgraphTarget
 readNode = str <&> \case
-    ('#' : tagText) -> Tag $ T.pack tagText
-    file            -> Link $ normalise file
+    ('#' : tagText) -> TagTarget tagText
+    file            -> FileTarget $ normalise file
 
 asLower :: (String -> b) -> String -> b
 asLower fn = fn . fmap C.toLower
@@ -154,11 +182,29 @@ parseTagDirection =
         <> value TagDirection.Out
         <> showDefault
         <> metavar "In|Out|Both"
+  where
+    readTagDirection :: ReadM TagDirection
+    readTagDirection = maybeReader . asLower $ \case
+        "in"   -> Just TagDirection.In
+        "out"  -> Just TagDirection.Out
+        "both" -> Just TagDirection.Both
+        _      -> Nothing
 
-readTagDirection :: ReadM TagDirection
-readTagDirection = maybeReader . asLower $ \case
-    "in"   -> Just TagDirection.In
-    "out"  -> Just TagDirection.Out
-    "both" -> Just TagDirection.Both
-    _      -> Nothing
+parseLogLevel :: Parser LogLevel.LogLevel
+parseLogLevel =
+    option readVerbosity
+        $  long "verbosity"
+        <> help "Modify the logging level"
+        <> short 'v'
+        <> metavar "DEBUG|INFO|ERROR|NONE"
+        <> value LogLevel.None
+        <> showDefault
+  where
+    readVerbosity :: ReadM LogLevel
+    readVerbosity = maybeReader . asLower $ \case
+        "debug" -> Just LogLevel.Debug
+        "info"  -> Just LogLevel.Info
+        "error" -> Just LogLevel.Error
+        "none"  -> Just LogLevel.None
+        _       -> Nothing
 

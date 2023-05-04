@@ -1,32 +1,32 @@
 {-# LANGUAGE DeriveGeneric #-}
-module MdGraph.Node where
 
-import           MdGraph.File                   ( fixLink )
+module MdGraph.Node where
 
 import           Data.Hashable
 import           Data.Text                     as T
 import           Data.Time                      ( UTCTime )
 import           GHC.Generics                   ( Generic )
 
-data Node = Link { linkPath :: FilePath} | Tag { tagLabel :: Text }
+data Link = Link
+    { linkPath :: FilePath
+    , linkText :: Text
+    }
     deriving (Eq, Generic, Show)
 
-instance Hashable Node where
+instance Hashable Link
 
-printNode :: Node -> String
-printNode (Tag  text) = T.unpack . T.concat $ ["#", text]
-printNode (Link path) = path
+data Tag = Tag
+    { tagLabel :: Text
+    }
+    deriving (Eq, Generic, Show)
 
-nodePath :: Node -> Maybe FilePath
-nodePath (Link l) = Just l
-nodePath _        = Nothing
+instance Hashable Tag
 
-tagText :: Node -> Maybe Text
-tagText (Tag t) = Just t
-tagText _       = Nothing
+-- | A link with an absolute filepath
+newtype AbsoluteLink = AbsoluteLink { unAbsoluteLink :: Link }
+    deriving Show
 
-fixNode :: FilePath -> FilePath -> Node -> IO Node
-fixNode defExt source (  Link path) = Link <$> fixLink defExt source path
-fixNode _      _      t@(Tag  _   ) = pure t
-
+-- | A link with a filepath relative to the library
+newtype RelativeLink = RelativeLink { unRelativeLink :: Link }
+    deriving Show
 
