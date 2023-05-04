@@ -59,3 +59,10 @@ instance ToEdge RelativeLink where
         , edgeHead  = linkPath
         , edgeLabel = T.unpack linkText
         }
+
+class ToTag a where
+  toTag :: Key Document -> a -> Tag
+
+instance ToTag Node.Tag where
+    toTag docKey (Node.Tag tagLabel) =
+        Tag { tagName = T.unpack tagLabel, tagFile = docKey }

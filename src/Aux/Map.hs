@@ -14,8 +14,8 @@ flop :: Ord l => (v -> l) -> Map k v -> Map l k
 flop keySelector map_ = fromList $ swap . mapSnd keySelector <$> toList map_
 
 -- | Join two maps
-unionWith' :: Ord k => Map k a -> Map k b -> Map k (a, b)
-unionWith' mapA mapB =
+unionZip :: Ord k => Map k a -> Map k b -> Map k (a, b)
+unionZip mapA mapB =
     fromList . catMaybes $ flip Prelude.map commonKeys $ \key -> do
         valueOne <- mapA !? key
         valueTwo <- mapB !? key

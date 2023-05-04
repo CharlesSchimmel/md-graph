@@ -1,4 +1,5 @@
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -19,6 +20,7 @@ import           Data.Maybe
 import           Data.Text                     as T
 import           Data.Time                      ( UTCTime )
 import           Data.Traversable              as T
+import           GHC.Generics                   ( Generic )
 import           MdGraph.Util                   ( trace'' )
 import           Prelude                       as P
 import           System.Directory              as D
@@ -26,11 +28,15 @@ import           System.FilePath               as F
 
 -- | Paths relative to the library directory
 newtype RelativePath = RelativePath { unRelativePath :: FilePath }
-  deriving (Show, Ord, Eq)
+  deriving (Show, Ord, Eq, Generic)
+
+instance Hashable RelativePath
 
 -- | Paths absolute to the filesystem
 newtype AbsolutePath = AbsolutePath { unAbsolutePath :: FilePath }
-  deriving (Show, Ord, Eq)
+  deriving (Show, Ord, Eq, Generic)
+
+instance Hashable AbsolutePath
 
 class IsFile a where
   unFile :: a -> FilePath
