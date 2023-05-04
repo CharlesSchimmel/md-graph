@@ -165,7 +165,7 @@ prepareDatabase = do
                         (ppcDocument, ) <$> links
                     )
 
-    -- The links have paths relative to their file
+    -- The links have paths relative to the library
     let docKeyAndRelativeLinks =
             fmap (mkRelativeLinks libraryPath) <$> docKeyAndAbsoluteLinks
 
