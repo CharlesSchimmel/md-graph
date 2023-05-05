@@ -176,9 +176,12 @@ expand extension (D path) = do
 -- or we could run into filepath collisions.
 
 -- | canonicalize path and also convert tilde home directory reference to actual
-trueAbsolutePathIO :: FilePath -> IO FilePath
-trueAbsolutePathIO path = do
-  detilde path >>= makeAbsolute
+trueAbsolutePathIO :: FilePath -> IO AbsolutePath
+trueAbsolutePathIO path = AbsolutePath <$> (detilde path >>= makeAbsolute)
+
+makeRelative' :: AbsolutePath -> AbsolutePath -> RelativePath
+makeRelative' (AbsolutePath a) (AbsolutePath b) =
+  RelativePath $ makeRelative a b
 
 detilde :: FilePath -> IO FilePath
 detilde path = do

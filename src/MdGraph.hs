@@ -207,11 +207,11 @@ mkAbsoluteLinks knownPaths defaultExtension ctx@PostParseCtx { ppcLinks, ppcFile
         rerelativizeLink knownPaths defaultExtension (absolutePath ppcFile)
             <$> ppcLinks
 
-mkRelativeLinks :: FilePath -> AbsoluteLink -> RelativeLink
-mkRelativeLinks libraryPath (AbsoluteLink link@Link { linkPath, linkText }) =
-    RelativeLink $ Link { linkText = linkText
-                        , linkPath = makeRelative libraryPath linkPath
-                        }
+mkRelativeLinks :: AbsolutePath -> AbsoluteLink -> RelativeLink
+mkRelativeLinks (AbsolutePath libraryPath) (AbsoluteLink link@Link { linkPath, linkText })
+    = RelativeLink $ Link { linkText = linkText
+                          , linkPath = makeRelative libraryPath linkPath
+                          }
 
 -- Take the list of known files
 -- Take the parsed links

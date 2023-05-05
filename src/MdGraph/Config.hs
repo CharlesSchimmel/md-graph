@@ -11,7 +11,8 @@ import qualified Data.Text                     as T
                                                 )
 import           MdGraph.App.Arguments          ( Arguments(..) )
 import           MdGraph.App.LogLevel
-import           MdGraph.File.Internal          ( maybeDirectory
+import           MdGraph.File.Internal          ( AbsolutePath(..)
+                                                , maybeDirectory
                                                 , trueAbsolutePathIO
                                                 )
 import           MdGraph.Persist                ( dbArgToConnString )
@@ -27,7 +28,7 @@ data Config = Config
   { logLevel         :: LogLevel
   , defaultExtension :: FilePath
   -- | Absolute library path
-  , libraryPath      :: FilePath
+  , libraryPath      :: AbsolutePath
   , dbConnString     :: T.Text
   }
   deriving Show
@@ -41,9 +42,11 @@ argsToConfig args@Arguments {..} = do
     mbDbPath <- liftIO $ dbArgToConnString argDatabase
     maybe (throwError "Invalid database path given") pure mbDbPath
 
-  libraryPath :: ExceptT T.Text IO FilePath
+  libraryPath :: ExceptT T.Text IO AbsolutePath
   libraryPath = do
     absoluteLibraryDir <- liftIO $ trueAbsolutePathIO argLibrary
-    liftIO (maybeDirectory absoluteLibraryDir)
-      >>= maybe (throwError "Library directory does not exist") pure
+    maybePath <- liftIO . maybeDirectory . unAbsolutePath $ absoluteLibraryDir
+    maybe (throwError "Library directory does not exist")
+          (pure . AbsolutePath)
+          maybePath
 

@@ -35,6 +35,9 @@ import           MdGraph.Config                 ( Config
 import           MdGraph.File                   ( Files
                                                 , trueAbsolutePath
                                                 )
+import           MdGraph.File.Internal          ( RelativePath(..)
+                                                , makeRelative'
+                                                )
 import           MdGraph.Persist.Class          ( Queries(..) )
 import           MdGraph.Persist.Query         as Q
 import           MdGraph.Persist.Schema
@@ -97,9 +100,9 @@ runSubgraphOnArg
 runSubgraphOnArg linkGetter maxDepth foundPaths (FileTarget path) = do
   libPath <- libraryPath <$> getConfig
   absPath <- trueAbsolutePath path
-  let relPath = makeRelative libPath absPath
+  let relPath = makeRelative' libPath absPath
   -- TODO: fix infinite depth to be a real value instead of this hack
-  runSubgraphPath' linkGetter maxDepth 0 foundPaths relPath
+  runSubgraphPath' linkGetter maxDepth 0 foundPaths (unRelativePath relPath)
 
 runSubgraphOnArg _ _ _ _ = pure S.empty -- TODO
 

@@ -28,10 +28,12 @@ import           MdGraph.Config                 ( Config(..)
                                                 , HasConfig(getConfig)
                                                 )
 import qualified MdGraph.File.Internal         as Internal
-import           MdGraph.File.Internal          ( File(..) )
+import           MdGraph.File.Internal          ( AbsolutePath(..)
+                                                , File(..)
+                                                )
 
 class Files m where
-  trueAbsolutePath :: FilePath -> m FilePath
+  trueAbsolutePath :: FilePath -> m AbsolutePath
   maybeFile :: FilePath -> m (Maybe FilePath)
   findDocuments :: m [File]
   relativizeWithExtension :: FilePath -> FilePath -> m FilePath
@@ -48,10 +50,12 @@ instance Files App where
         return fixedLink
     findDocuments = do
         config@Config {..} <- getConfig
-        liftIO $ Internal.findDocuments defaultExtension [libraryPath]
+        liftIO $ Internal.findDocuments defaultExtension
+                                        [unAbsolutePath libraryPath]
     getQualifiedDocumentPath path = do
         Config {..} <- getConfig
         -- what about subdirs
         let withExtension = path <.> defaultExtension
-        maybeFullPathWithExtension <- maybeFile (libraryPath </> withExtension)
+        maybeFullPathWithExtension <- maybeFile
+            (unAbsolutePath libraryPath </> withExtension)
         return $ maybe path (const withExtension) maybeFullPathWithExtension
