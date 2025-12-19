@@ -67,6 +67,8 @@ library
     , esqueleto
     , filepath
     , hashable
+    , hspec
+    , hspec-contrib
     , monad-logger
     , mtl
     , network-uri
@@ -103,6 +105,8 @@ executable md-graph
     , esqueleto
     , filepath
     , hashable
+    , hspec
+    , hspec-contrib
     , md-graph
     , monad-logger
     , mtl
@@ -141,6 +145,8 @@ test-suite md-graph-test
     , esqueleto
     , filepath
     , hashable
+    , hspec
+    , hspec-contrib
     , md-graph
     , monad-logger
     , mtl
