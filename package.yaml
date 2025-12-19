@@ -22,7 +22,8 @@ description:         Please see the README on GitHub at <https://github.com/gith
 default-extensions: OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
 
 dependencies:
-- base >= 4.7 && < 5
+# - base >= 4.7 && < 5
+- base 
 - async
 - containers
 - cryptohash-md5
@@ -30,7 +31,7 @@ dependencies:
 - esqueleto
 - filepath
 - hashable
-- hashable-time
+- time-compat
 - monad-logger
 - mtl
 - network-uri

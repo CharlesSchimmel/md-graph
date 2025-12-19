@@ -9,8 +9,8 @@ import           Control.Applicative            ( Applicative(liftA2) )
 import           Control.Exception              ( throwIO )
 import           Control.Monad                  ( join )
 import           Control.Monad.Except           ( MonadError(throwError)
-                                                , MonadIO(liftIO)
                                                 )
+import           Control.Monad.IO.Class         ( liftIO )
 import           Control.Monad.Reader           ( asks )
 import qualified Data.Foldable                 as F
 import           Data.HashSet                  as S
