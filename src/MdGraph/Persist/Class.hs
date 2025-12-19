@@ -1,38 +1,41 @@
 module MdGraph.Persist.Class where
 
-import           Control.Monad.Reader           ( MonadIO(liftIO)
-                                                , asks
-                                                )
-import           Data.Int                       ( Int64 )
-import           Data.Map.Strict               as M
-import           Data.Text                      ( Text )
-import           Database.Persist               ( Entity )
-import           Database.Persist.Sqlite        ( runSqlite )
-import           MdGraph.App                    ( App(App)
-                                                , Env(config)
-                                                )
-import           MdGraph.Config                 ( Config(dbConnString) )
-import qualified MdGraph.Persist.Query         as Q
-import           MdGraph.Persist.Schema         ( Document
-                                                , Edge
-                                                , Key
-                                                , Query
-                                                , Tag
-                                                , TempDocument
-                                                , migrateMdGraph
-                                                )
+import Control.Monad.Reader
+  ( MonadIO (liftIO),
+    asks,
+  )
+import Data.Int (Int64)
+import Data.Map.Strict as M
+import Data.Text (Text)
+import Database.Persist (Entity)
+import Database.Persist.Sqlite (runSqlPersistM, runSqlite)
+import MdGraph.App
+  ( App (App),
+    Env (config, sqliteBackend),
+  )
+import MdGraph.Config (Config (dbConnString))
+import qualified MdGraph.Persist.Query as Q
+import MdGraph.Persist.Schema
+  ( Document,
+    Edge,
+    Key,
+    Query,
+    Tag,
+    TempDocument,
+    migrateMdGraph,
+  )
 
 class RunsQuery m where
   runQuery :: Query a -> m a
 
 instance RunsQuery App where
-    runQuery query = do
-        conn <- asks $ dbConnString . config
-        liftIO . runSqlite conn $ query
+  runQuery query = do
+    conn <- asks sqliteBackend
+    liftIO . flip runSqlPersistM conn $ query
 
 class PreparesDb m where
   migrate :: m [Text]
-  insertEdges :: [Edge] -> m [Key  Edge]
+  insertEdges :: [Edge] -> m [Key Edge]
   insertTags :: [Tag] -> m [Key Tag]
   insertDocuments :: [Document] -> m (M.Map (Key Document) Document)
   insertTempDocuments :: [TempDocument] -> m [Key TempDocument]
@@ -42,16 +45,15 @@ class PreparesDb m where
   pruneModifiedDocuments :: m Int64
 
 instance PreparesDb App where
-    migrate                     = runQuery migrateMdGraph
-    insertEdges                 = runQuery . Q.insertEdges
-    insertTags                  = runQuery . Q.insertTags
-    insertDocuments             = runQuery . Q.insertDocuments
-    insertTempDocuments         = runQuery . Q.insertTempDocuments
-    getNewDocuments             = runQuery Q.newFiles
-    pruneUnchangedTempDocuments = runQuery Q.pruneUnchangedTempDocs
-    pruneDeletedDocuments       = runQuery Q.pruneDeletedDocuments
-    pruneModifiedDocuments      = runQuery Q.pruneModifiedDocs
-
+  migrate = runQuery migrateMdGraph
+  insertEdges = runQuery . Q.insertEdges
+  insertTags = runQuery . Q.insertTags
+  insertDocuments = runQuery . Q.insertDocuments
+  insertTempDocuments = runQuery . Q.insertTempDocuments
+  getNewDocuments = runQuery Q.newFiles
+  pruneUnchangedTempDocuments = runQuery Q.pruneUnchangedTempDocs
+  pruneDeletedDocuments = runQuery Q.pruneDeletedDocuments
+  pruneModifiedDocuments = runQuery Q.pruneModifiedDocs
 
 class Queries m where
   getOrphans :: m [Entity Document]
@@ -61,8 +63,8 @@ class Queries m where
   getNonexistants :: m [Entity Edge]
 
 instance Queries App where
-    getOrphans       = runQuery Q.orphansM
-    getUnreachables  = runQuery Q.unreachableM
-    getForwardLinks  = runQuery . Q.forwardLinks
-    getBackwardLinks = runQuery . Q.backwardLinks
-    getNonexistants  = runQuery Q.nonexistant
+  getOrphans = runQuery Q.orphansM
+  getUnreachables = runQuery Q.unreachableM
+  getForwardLinks = runQuery . Q.forwardLinks
+  getBackwardLinks = runQuery . Q.backwardLinks
+  getNonexistants = runQuery Q.nonexistant
