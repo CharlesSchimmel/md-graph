@@ -81,27 +81,27 @@ main = do
         let command =
               Subgraph $
                 SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> "subdir/uses directory traversal.md"],
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.usesDirectoryTraversal_md],
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
                     sgDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args `shouldReturn` Right ["subdir/uses directory traversal.md", "parent.md"]
+        mdGraph args `shouldReturn` Right [Constants.usesDirectoryTraversal_md, Constants.parent_md]
 
       it "Convoluted directory traversals are resolved and simplified" $ do
         let command =
               Subgraph $
                 SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> "subdir/uses convoluted directory traversal.md"],
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.usesConvolutedDirectoryTraversal_md],
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
                     sgDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains "parent.md"
+        mdGraph args >>= outputContains Constants.parent_md
 
     describe "Orphans" $ do
       it "Files with no links to or from them are identified" $ do
@@ -116,6 +116,20 @@ main = do
       it "Files that have links but have no links to them are identified" $ do
         let args = defaultSpecArgs {argCommand = Command.Unreachable}
         mdGraph args >>= outputContains Constants.unreachable_md
+
+    describe "Parsing" $ do
+      it "File extensions in links may be omitted and the default is used instead" $ do
+        let command =
+              Subgraph $
+                SubgraphOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.linksDontHaveExtensions_md],
+                    sgInclNonex = True,
+                    sgInclStatic = True,
+                    sgTagDir = TagDirection.In,
+                    sgDepth = -1
+                  }
+        let args = defaultSpecArgs {argCommand = command}
+        mdGraph args >>= outputContains Constants.parent_md
 
     pure ()
 
@@ -142,24 +156,6 @@ aoeu source dest = trueDest </> joinDir absoluteParts
     relativeParts = length . takeWhile isRelativePart $ destParts
     absoluteParts = dropWhile isRelativePart destParts
     trueDest = joinDir $ reverse . drop relativeParts . reverse $ sourceParts
-
--- |
--- @list \`shouldContain\` sublist@ sets the expectation that @sublist@ is contained,
--- wholly and intact, anywhere in @list@.
--- shouldContain :: (HasCallStack, Show a, Eq a) => [a] -> [a] -> Expectation
--- shouldContain = compareWith isInfixOf "does not contain"
-
--- -- |
--- -- @xs \`shouldMatchList\` ys@ sets the expectation that @xs@ has the same
--- -- elements that @ys@ has, possibly in another order
--- shouldMatchList :: (HasCallStack, Show a, Eq a) => [a] -> [a] -> Expectation
--- xs `shouldMatchList` ys = maybe (return ()) expectationFailure (matchList xs ys)
-
--- -- |
--- -- @action \`shouldReturn\` expected@ sets the expectation that @action@
--- -- returns @expected@.
--- shouldReturn :: (HasCallStack, Show a, Eq a) => IO a -> a -> Expectation
--- action `shouldReturn` expected = action >>= (`shouldBe` expected)
 
 shouldContainIO :: (HasCallStack, Show a, Eq a) => IO [a] -> [a] -> Expectation
 action `shouldContainIO` expected = action >>= (`shouldContain` expected)

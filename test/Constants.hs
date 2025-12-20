@@ -17,3 +17,5 @@ usesDirectoryTraversal_md = "subdir/uses directory traversal.md"
 usesConvolutedDirectoryTraversal_md = "subdir/uses convoluted directory traversal.md"
 
 unreachable_md = "unreachable.md"
+
+linksDontHaveExtensions_md = "links-dont-have-extensions.md"
