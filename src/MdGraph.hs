@@ -18,12 +18,14 @@ import Control.Monad
   ( forM,
     join,
   )
+import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Identity (Identity (..))
 import Control.Monad.Reader
   ( MonadReader (ask),
     asks,
   )
+import Control.Monad.Trans.Reader (ReaderT (runReaderT))
 import Data.Either (rights)
 import Data.Foldable as F
   ( mapM_,
@@ -41,7 +43,9 @@ import qualified Data.Text.IO as T
 import Database.Persist.Sqlite
   ( Entity (entityVal),
     runSqlite,
+    wrapConnection,
   )
+import Database.Sqlite (open)
 import Debug.Trace (trace)
 import MdGraph.App
 import MdGraph.App.Arguments
@@ -89,22 +93,31 @@ import Prelude as P
     putStrLn,
   )
 
-mdGraph :: Command -> App ()
-mdGraph command = do
-  prepareDatabase
-  -- (flip $ maybe (pure ())) maybeCommand $ \command -> do
-  logDebug . T.pack $ show command
-  docPaths <- runCommand command
-  liftIO $ F.mapM_ putStrLn docPaths
-
--- prepareDatabaseFile :: App ()
--- prepareDatabaseFile = do
+mdGraph :: Arguments -> IO (Either T.Text [String])
+mdGraph args@Arguments {argCommand} = do
+  conf <- runExceptT $ argsToConfig args
+  -- TODO: Better error handling here
+  join <$> mapM withConf conf
+  where
+    withConf conf = do
+      conn <- open $ dbConnString conf
+      sqlBackend <- wrapConnection conn (\_ _ _ _ -> return ())
+      let env = Env conf sqlBackend
+      -- It's a little pointless to have this function and mdGraph function.
+      -- TODO: Merge them
+      runExceptT (runReaderT (runApp $ prepareDbAndRun argCommand) env)
+    prepareDbAndRun :: Command -> App [String]
+    prepareDbAndRun command = do
+      prepareDatabase
+      logDebug . T.pack $ show command
+      runCommand command
 
 prepareDatabase ::
   (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m) => m ()
 prepareDatabase = do
   Config {defaultExtension, libraryPath, dbConnString} <- getConfig
-  logDebug $ T.concat ["Preparing database", dbConnString]
+  logDebug $ T.unwords ["Using library:", T.pack libraryPath]
+  logDebug $ T.unwords ["Preparing database:", dbConnString]
   migrate
 
   -- find documents
@@ -191,6 +204,7 @@ prepareDatabase = do
     . T.unwords
     $ ["Found", T.pack . show . P.length $ newEdges, "new edges"]
 
+  logDebug . T.pack . show $ newEdges
   logDebug "Inserting new edges"
   insertEdges newEdges
 

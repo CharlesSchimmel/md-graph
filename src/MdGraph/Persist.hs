@@ -22,11 +22,11 @@ import System.IO
 import System.Posix.Temp
 
 dbArgToConnString :: DatabaseArg -> IO (Maybe T.Text)
-dbArgToConnString (DbFile ":memory:") = pure . pure $ ":memory:"
+dbArgToConnString (DbFile ":memory:") = return . Just $ ":memory:"
 dbArgToConnString (DbFile path) = do
   absPath <- T.pack <$> trueAbsolutePathIO (T.unpack path)
   -- TODO:
   -- If it's a new file, then attempt creating an empty file
   -- Check if file can be Read-Written
-  exists <- liftIO $ withFile (T.unpack absPath) ReadWriteMode hIsWritable
+  exists <- withFile (T.unpack absPath) ReadWriteMode hIsWritable
   return $ if exists then Just absPath else Nothing

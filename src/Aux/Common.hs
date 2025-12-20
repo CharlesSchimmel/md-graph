@@ -14,3 +14,6 @@ batch batchSize [] = []
 batch batchSize list = headBatch : batch batchSize remainder
   where
     (headBatch, remainder) = splitAt batchSize list
+
+unbool :: (a -> Bool) -> a -> Maybe a
+unbool test a = if test a then Just a else Nothing

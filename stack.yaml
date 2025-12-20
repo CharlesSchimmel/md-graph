@@ -65,3 +65,7 @@ packages:
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
+
+# Enables haskell-language-server to pull more haddock information
+ghc-options:
+  '$everything': -haddock

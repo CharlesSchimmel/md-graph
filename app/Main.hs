@@ -5,6 +5,7 @@ import Aux.Map as M
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Monad
   ( forM,
+    join,
     void,
   )
 import Control.Monad.Except (runExceptT)
@@ -20,7 +21,7 @@ import Data.HashSet as S
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes)
 import Data.Text as T
-import Data.Text.IO as T
+import qualified Data.Text.IO as T
 import Database.Persist.Sqlite (wrapConnection)
 import Database.Sqlite (open)
 import MdGraph
@@ -39,7 +40,7 @@ import MdGraph.Persist.Schema
   )
 import Options.Applicative
 import Prelude
-import Prelude as P
+import Prelude as Prelude
   ( foldr,
     length,
     map,
@@ -50,11 +51,5 @@ import Prelude as P
 main :: IO ()
 main = do
   args@Arguments {..} <- cliArguments
-  conf <- runExceptT $ argsToConfig args
-  -- TODO: Better error handling here
-  forEither conf (T.putStrLn) $ \conf -> do
-    conn <- open $ dbConnString conf
-    sqlBackend <- wrapConnection conn (\_ _ _ _ -> return ())
-    let env = Env conf sqlBackend
-    out <- runExceptT (runReaderT (runApp $ mdGraph argCommand) env)
-    either T.putStrLn (const $ pure ()) out
+  out <- mdGraph args
+  either T.putStrLn (F.mapM_ Prelude.putStrLn) out

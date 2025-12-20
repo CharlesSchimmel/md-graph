@@ -67,8 +67,6 @@ library
     , esqueleto
     , filepath
     , hashable
-    , hspec
-    , hspec-contrib
     , monad-logger
     , mtl
     , network-uri
@@ -90,9 +88,37 @@ library
 executable md-graph
   main-is: Main.hs
   other-modules:
+      Aux.Common
+      Aux.HashMap
+      Aux.HashSet
+      Aux.Map
+      Aux.Tuple
+      MdGraph
+      MdGraph.App
+      MdGraph.App.Arguments
+      MdGraph.App.Command
+      MdGraph.App.Logger
+      MdGraph.App.LogLevel
+      MdGraph.App.RunCommand
+      MdGraph.Config
+      MdGraph.File
+      MdGraph.File.Internal
+      MdGraph.Node
+      MdGraph.Parse
+      MdGraph.Parse.Pandoc
+      MdGraph.Persist
+      MdGraph.Persist.Class
+      MdGraph.Persist.Graph
+      MdGraph.Persist.Mapper
+      MdGraph.Persist.Query
+      MdGraph.Persist.Schema
+      MdGraph.TagDirection
+      MdGraph.Types
+      MdGraph.Util
       Paths_md_graph
   hs-source-dirs:
       app
+      src
   default-extensions:
       OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
@@ -105,8 +131,6 @@ executable md-graph
     , esqueleto
     , filepath
     , hashable
-    , hspec
-    , hspec-contrib
     , md-graph
     , monad-logger
     , mtl
@@ -130,6 +154,7 @@ test-suite md-graph-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Constants
       Paths_md_graph
   hs-source-dirs:
       test

@@ -1,2 +1,26 @@
 cradle:
   stack:
+    # - path: "./test"
+    #   component: "md-graph-test"
+    # - path: "./src"
+    #   component: "md-graph"
+    # - path: "./app"
+    #   component: "md-graph"
+    # - path: "./test"
+    #   component: "md-graph:md-graph-test"
+    # - path: "./src"
+    #   component: "md-graph:md-graph"
+    # - path: "./app"
+    #   component: "md-graph:md-graph"
+    - path: "./src"
+      component: "md-graph:exe:md-graph"
+
+    - path: "./app/Main.hs"
+      component: "md-graph:exe:md-graph"
+
+    - path: "./app/Paths_md_graph.hs"
+      component: "md-graph:exe:md-graph"
+
+    - path: "./test/Spec.hs"
+      component: "md-graph:test:md-graph-test"
+      # component: "md-graph:exe:md-graph"

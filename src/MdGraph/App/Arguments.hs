@@ -25,7 +25,7 @@ import System.Directory as D
 import System.FilePath as F
 import Prelude as P
 
-data DatabaseArg = DbFile {dbFile :: Text}
+newtype DatabaseArg = DbFile {dbFile :: Text}
   deriving (Show)
 
 data Arguments = Arguments
@@ -89,15 +89,14 @@ parseCommand =
 parseDatabase :: Parser DatabaseArg
 parseDatabase =
   DbFile
-    <$> ( strOption
-            ( long "database"
-                <> short 'd'
-                <> help "Sqlite database to use. If no argument is given, an in-memory database will be used for this command."
-                <> metavar "DB"
-                <> value ":memory:"
-                <> showDefault
-            )
-        )
+    <$> strOption
+      ( long "database"
+          <> short 'd'
+          <> help "Sqlite database to use. If no argument is given, an in-memory database will be used for this command."
+          <> metavar "DB"
+          <> value ":memory:"
+          <> showDefault
+      )
 
 parseLibrary :: Parser FilePath
 parseLibrary =
