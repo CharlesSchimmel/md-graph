@@ -131,7 +131,20 @@ main = do
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains Constants.parent_md
 
-    pure ()
+    -- Just making sure Pandoc is behaving as we expect
+    describe "Parsing" $ do
+      it "Links may use angle brackets and hint text" $ do
+        let command =
+              Subgraph $
+                SubgraphOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.angleBrackets_md],
+                    sgInclNonex = True,
+                    sgInclStatic = True,
+                    sgTagDir = TagDirection.In,
+                    sgDepth = -1
+                  }
+        let args = defaultSpecArgs {argCommand = command}
+        mdGraph args >>= outputContains Constants.parent_md
 
 getLibraryDir :: IO FilePath
 getLibraryDir = do

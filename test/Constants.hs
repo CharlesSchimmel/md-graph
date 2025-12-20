@@ -19,3 +19,5 @@ usesConvolutedDirectoryTraversal_md = "subdir/uses convoluted directory traversa
 unreachable_md = "unreachable.md"
 
 linksDontHaveExtensions_md = "links-dont-have-extensions.md"
+
+angleBrackets_md = "angle-brackets.md"
