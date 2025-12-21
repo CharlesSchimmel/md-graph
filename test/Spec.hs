@@ -117,6 +117,11 @@ main = do
         let args = defaultSpecArgs {argCommand = Command.Unreachable}
         mdGraph args >>= outputContains Constants.unreachable_md
 
+    describe "Nonexistant" $ do
+      it "Files" $ do
+        let args = defaultSpecArgs {argCommand = Command.Nonexes}
+        mdGraph args >>= outputContains "this-goes-nowhere.md"
+
     describe "Parsing" $ do
       it "File extensions in links may be omitted and the default is used instead" $ do
         let command =
@@ -131,8 +136,6 @@ main = do
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains Constants.parent_md
 
-    -- Just making sure Pandoc is behaving as we expect
-    describe "Parsing" $ do
       it "Links may use angle brackets and hint text" $ do
         let command =
               Subgraph $

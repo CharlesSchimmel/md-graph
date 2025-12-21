@@ -21,3 +21,5 @@ unreachable_md = "unreachable.md"
 linksDontHaveExtensions_md = "links-dont-have-extensions.md"
 
 angleBrackets_md = "angle-brackets.md"
+
+hasNonExistentLink_md = "has-nonexistent-link.md"
