@@ -117,7 +117,7 @@ main = do
         let args = defaultSpecArgs {argCommand = Command.Unreachable}
         mdGraph args >>= outputContains Constants.unreachable_md
 
-    describe "Nonexistant" $ do
+    describe "Nonexistent" $ do
       it "Files" $ do
         let args = defaultSpecArgs {argCommand = Command.Nonexes}
         mdGraph args >>= outputContains "this-goes-nowhere.md"

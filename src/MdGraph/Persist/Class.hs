@@ -60,11 +60,11 @@ class Queries m where
   getUnreachables :: m [Entity Document]
   getForwardLinks :: FilePath -> m [Entity Document]
   getBackwardLinks :: FilePath -> m [Entity Document]
-  getNonexistants :: m [Entity Edge]
+  getNonexistents :: m [Entity Edge]
 
 instance Queries App where
   getOrphans = runQuery Q.orphansM
   getUnreachables = runQuery Q.unreachableM
   getForwardLinks = runQuery . Q.forwardLinks
   getBackwardLinks = runQuery . Q.backwardLinks
-  getNonexistants = runQuery Q.nonexistant
+  getNonexistents = runQuery Q.nonexistent

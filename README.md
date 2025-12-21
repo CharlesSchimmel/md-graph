@@ -29,7 +29,7 @@ Available commands:
   backlinks                The backlinks (reverse subgraph) of a node
   unreachable              Files that are not linked to
   orphans                  Files without any links
-  nonexistant              Links that cannot be resolved
+  nonexistent              Links that cannot be resolved
   static                   Links that can be resolved but are not notes
   populate                 Just populate the database
 ```

@@ -53,7 +53,7 @@ import System.FilePath (makeRelative)
 runCommand :: Command -> App [String]
 runCommand Orphans = fmap documentPath <$> runOrphans
 runCommand Unreachable = fmap documentPath <$> runUnreachable
-runCommand Nonexes = fmap edgeHead <$> runNonexistant
+runCommand Nonexes = fmap edgeHead <$> runNonexistent
 runCommand (Subgraph options) = runSubgraph options
 runCommand (Backlinks options) = runBacklinks options
 runCommand Statics = throwError "NYI"
@@ -72,11 +72,11 @@ runUnreachable = do
     T.unwords ["Found", T.pack . show . length $ orphanDocs, "unreachable"]
   return $ entityVal <$> orphanDocs
 
-runNonexistant :: (Monad m, Queries m, Logs m) => m [Edge]
-runNonexistant = do
-  nonexes <- getNonexistants
+runNonexistent :: (Monad m, Queries m, Logs m) => m [Edge]
+runNonexistent = do
+  nonexes <- getNonexistents
   logDebug $
-    T.unwords ["Found", T.pack . show . length $ nonexes, "nonexistant"]
+    T.unwords ["Found", T.pack . show . length $ nonexes, "nonexistent"]
   return $ entityVal <$> nonexes
 
 runSubgraph ::

@@ -74,7 +74,7 @@ parseCommand =
           "orphans"
           (info (pure Orphans) $ progDesc "Files without any links")
         <> command
-          "nonexistant"
+          "nonexistent"
           (info (pure Nonexes) $ progDesc "Links that cannot be resolved")
         <> command
           "static"

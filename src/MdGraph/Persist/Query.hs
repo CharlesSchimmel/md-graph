@@ -15,7 +15,7 @@ module MdGraph.Persist.Query
     unreachableM,
     orphansM,
     pruneModifiedDocs,
-    nonexistant,
+    nonexistent,
     forwardLinks,
     backwardLinks,
   )
@@ -234,8 +234,8 @@ forwardLinks docPath = do
   return $ catMaybes documents
 
 -- | Edges without associated files
-nonexistant :: Query [Entity Edge]
-nonexistant = select $ do
+nonexistent :: Query [Entity Edge]
+nonexistent = select $ do
   (edge :& doc) <-
     from $
       table @Edge
