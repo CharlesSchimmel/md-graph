@@ -51,7 +51,6 @@ import Database.Persist.Sqlite
     wrapConnection,
   )
 import Database.Sqlite (open)
-import Debug.Trace (trace)
 import MdGraph.App
 import MdGraph.App.Arguments
 import MdGraph.App.Command (Command)
@@ -277,7 +276,7 @@ rerelativizeLink knownPaths defaultExtension (AbsolutePath sourcePath) link@Link
     linkTester :: (Monad m, Files m) => FilePath -> m Bool
     linkTester path =
       if S.member path knownPaths
-        then return True
+        then return $ trace'' "known path" True
         else do
           i <- maybeFile path
           return $ Maybe.isJust i

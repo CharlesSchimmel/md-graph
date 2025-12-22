@@ -1,5 +1,13 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use uncurry" #-}
 module MdGraph.File
   ( Files (..),
+    Internal.AbsolutePath (..),
+    Internal.RelativePath (..),
+    normaliseEvil,
+    unrelativize,
+    isAncestorOf,
   )
 where
 
@@ -42,31 +50,58 @@ class Files m where
   -- | Find all documents
   findDocuments :: m [File]
 
-  -- | Figure out if a Destination path exists relative to a Source path
-  relativizeWithExtension ::
-    -- | The Source path
-    FilePath ->
-    -- | The Destination path
-    FilePath ->
-    m FilePath
-
-  -- | Fix the document path if it resolves with an extension
-  getQualifiedDocumentPath :: FilePath -> m FilePath
-
 instance Files App where
   trueAbsolutePath = liftIO . Internal.trueAbsolutePathIO
   maybeFile = liftIO . Internal.maybeFile
-  relativizeWithExtension source dest = do
-    Config {defaultExtension} <- getConfig
-    fixedLink <- liftIO $ Internal.fixLink defaultExtension source dest
-    logDebug . T.pack . show $ fixedLink
-    return fixedLink
+
+  -- Never used
+  -- relativizeWithExtension source dest = do
+  --   Config {defaultExtension} <- getConfig
+  --   fixedLink <- liftIO $ Internal.fixLink defaultExtension source dest
+  --   logDebug . T.pack . show $ fixedLink
+  --   return fixedLink
   findDocuments = do
     config@Config {..} <- getConfig
     liftIO $ Internal.findDocuments defaultExtension [libraryPath]
-  getQualifiedDocumentPath path = do
-    Config {..} <- getConfig
-    -- what about subdirs
-    let withExtension = trace' $ path <.> defaultExtension
-    maybeFullPathWithExtension <- maybeFile (libraryPath </> withExtension)
-    return $ maybe path (const withExtension) maybeFullPathWithExtension
+
+type RebasedFilePath = FilePath
+
+-- -- | When an "source" file references a "dest" file, it may reference it
+-- -- relative to itself. For example, the source file "/foo/bar/baz.md" might
+-- -- reference the destination "qux.md". We need the destination's path to become
+-- -- "/foo/bar/qux.md"
+-- TODO: Enforce source and dest as absolute _files_ (not dirs?)?
+-- TODO: Detilde before reaching this function
+unrelativize :: Internal.AbsolutePath -> Internal.DestFilePath -> IO Internal.AbsolutePath
+unrelativize (Internal.AbsolutePath source) dest
+  | isAbsolute dest = return $ Internal.AbsolutePath dest
+  | otherwise = do
+      let sourceDir = takeDirectory source
+          unnormalisedDestDir = sourceDir </> dest
+      return . normaliseEvil $ Internal.AbsolutePath unnormalisedDestDir
+
+-- | Normalise "./" and "../" in an absolute filepathh
+-- This function is "evil" because it doesn't handle symlinks. In the real world /foo/../bar is not necessarily /bar.
+-- TODO: Just use canonicalizePath from System.Directory? That handles symlinks. It doesn't collapse the directory if it doesn't exist though, which doesn't work for testing.
+normaliseEvil :: Internal.AbsolutePath -> Internal.AbsolutePath
+-- normaliseEvil (Internal.AbsolutePath path) = Internal.AbsolutePath . foldl (</>) "" $ _normalise [] parts
+normaliseEvil (Internal.AbsolutePath path) = Internal.AbsolutePath . foldl (</>) "/" $ _normalise [] parts
+  where
+    -- normaliseEvil (Internal.AbsolutePath path) = Internal.AbsolutePath . show $ _normalise [] parts
+
+    parts = splitDirectories path
+    _normalise :: [FilePath] -> [FilePath] -> [FilePath]
+    _normalise (prev : acc) (".." : rem) = _normalise acc rem
+    _normalise [] (".." : rem) = _normalise [] rem
+    _normalise acc ("." : rem) = _normalise acc rem
+    _normalise acc (cur : rem) = _normalise (cur : acc) rem
+    _normalise acc [] = reverse acc
+
+-- | Check if parentPath is in the tree of childPath, ex /foo is in an ancestor of /foo/bar.md
+isAncestorOf :: Internal.AbsolutePath -> Internal.AbsolutePath -> Bool
+isAncestorOf (Internal.AbsolutePath parentPath) (Internal.AbsolutePath childPath) = length parentDirs == length commonDirs
+  where
+    parentDirs = splitDirectories parentPath
+    childDirs = splitDirectories childPath
+    zipped = zip parentDirs childDirs
+    commonDirs = takeWhile (\(parentDir, childDir) -> parentDir == childDir) zipped

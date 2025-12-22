@@ -13,6 +13,7 @@ import Data.Either (fromRight, isRight)
 import qualified Data.Text as T
 import Database.Persist.Sqlite (runSqlPersistM, wrapConnection)
 import Database.Sqlite (open)
+import qualified FilesSpec
 import MdGraph (mdGraph, rerelativizeLink)
 import qualified MdGraph
 import MdGraph.App (App (runApp), Env (Env))
@@ -23,7 +24,7 @@ import qualified MdGraph.App.Command as Command
 import qualified MdGraph.App.LogLevel as LogLevel
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config (Config (Config, libraryPath))
-import MdGraph.File (Files (..))
+import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
 import MdGraph.File.Internal (AbsolutePath (..), File, fixLink, reRelativize)
 import MdGraph.Node (Link (..))
 import qualified MdGraph.TagDirection as TagDirection
@@ -37,10 +38,8 @@ import Prelude
 
 data FakeFiles = FakeFiles
   { ffTrueAbsolutePath :: FilePath -> FilePath,
-    ffMaybeFile :: FilePath -> (Maybe FilePath),
-    ffFindDocuments :: [File],
-    ffRelativizeWithExtension :: FilePath -> FilePath -> FilePath,
-    ffGetQualifiedDocumentPath :: FilePath -> FilePath
+    ffMaybeFile :: FilePath -> Maybe FilePath,
+    ffFindDocuments :: [File]
   }
 
 newtype FilesMock a = FilesMock {runFilesMock :: ReaderT FakeFiles Identity a}
@@ -50,19 +49,14 @@ instance Files FilesMock where
   trueAbsolutePath a = asks ffTrueAbsolutePath <*> pure a
   maybeFile a = asks ffMaybeFile <*> pure a
   findDocuments = asks ffFindDocuments
-  relativizeWithExtension source dest = do
-    fn <- asks ffRelativizeWithExtension
-    return $ fn source dest
-  getQualifiedDocumentPath a = do
-    fn <- asks ffGetQualifiedDocumentPath
-    return $ fn a
 
 filesMock :: FakeFiles
-filesMock = FakeFiles id Just [] (\a b -> b) id
+filesMock = FakeFiles id Just []
 
 main :: IO ()
 main = do
   libraryDir <- getLibraryDir
+  hspec FilesSpec.spec
   hspec $ do
     describe "Backlinks" $ do
       it "Correct backlinks are returned" $ do

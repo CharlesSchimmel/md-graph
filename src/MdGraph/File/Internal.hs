@@ -70,6 +70,7 @@ type DestFilePath = FilePath
 
 -- TODO? does not support oddly placed parent-traversal like `foo/bar/baz/../file-in-bar.md`
 -- On the other hand, neither does System.Directory's canonicalizePath. See https://neilmitchell.blogspot.com/2015/10/filepaths-are-subtle-symlinks-are-hard.html
+-- We know that the destination must be accessible from the library root, so we could use findFileWith to get the library-relative path
 
 -- | If a destination path has parent directory traversal (../), flatten it
 -- with its source to remove the directory traversal
@@ -204,6 +205,7 @@ trueAbsolutePathIO :: FilePath -> IO FilePath
 trueAbsolutePathIO path = do
   detilde path >>= makeAbsolute
 
+-- TODO: shouldn't the shell expand this before passing it in?
 detilde :: FilePath -> IO FilePath
 detilde path = do
   homePath <- getHomeDirectory
