@@ -4,6 +4,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StrictData #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Eta reduce" #-}
 
 module MdGraph.File.Internal where
 
@@ -21,7 +24,7 @@ import Data.Text as T
 import Data.Time (UTCTime)
 import Data.Traversable as T
 import GHC.Generics (Generic)
-import MdGraph.Util (trace'')
+import MdGraph.Util (trace', trace'')
 import System.Directory as D
 import System.FilePath as F
 import Prelude as P
@@ -57,28 +60,37 @@ data File = File
 doubleDot :: FilePath
 doubleDot = ".."
 
+type DefaultExtension = FilePath
+
+type FileExtension = FilePath
+
+type SourceFilePath = FilePath
+
+type DestFilePath = FilePath
+
 -- TODO? does not support oddly placed parent-traversal like `foo/bar/baz/../file-in-bar.md`
---
+-- On the other hand, neither does System.Directory's canonicalizePath. See https://neilmitchell.blogspot.com/2015/10/filepaths-are-subtle-symlinks-are-hard.html
 
 -- | If a destination path has parent directory traversal (../), flatten it
 -- with its source to remove the directory traversal
-reRelativize :: FilePath -> FilePath -> FilePath
+reRelativize :: SourceFilePath -> DestFilePath -> FilePath
 reRelativize sourceFile destination
-  | not $ isRelative destination = destination
-  | otherwise = trueDest </> joinDir absoluteParts
+  | not $ isRelative destination = trace'' "notRelative" destination
+  | otherwise = trace'' "isRelative" $ trueDest </> joinDir absoluteParts
   where
     sourceParts = splitDirectories . takeDirectory $ sourceFile
     destParts = splitDirectories destination
     isRelativePart = (== doubleDot)
     -- \| Just the double dots
-    relativeParts = L.length . L.takeWhile isRelativePart $ destParts
+    numRelativeParts = L.length . L.takeWhile isRelativePart $ destParts
     -- \| The actually useful parts of the destination path that aren't double
     -- dots
     absoluteParts = L.dropWhile isRelativePart destParts
-    -- \| The parts of the sourceFile path without the directories popped by the
-    -- destination's ../'s
+    -- \| Take the source path parts (all of the directory names that comprise the
+    -- full path); remove directories from the end equal to the number of '..'
+    -- in the relative destination.
     trueDest =
-      joinDir $ L.reverse . L.drop relativeParts . L.reverse $ sourceParts
+      joinDir $ L.reverse . L.drop numRelativeParts . L.reverse $ sourceParts
 
 -- TODO: why not joinPath?
 joinDir [] = ""
@@ -86,7 +98,7 @@ joinDir paths = P.foldr1 (</>) paths
 
 -- | Figure out if a path exists relative to the file it came from. Check if a
 -- path exists with extension, with reRelativization, with rerel and extension.
-fixLink :: FilePath -> FilePath -> FilePath -> IO FilePath
+fixLink :: DefaultExtension -> SourceFilePath -> DestFilePath -> IO DestFilePath
 fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
   where
     result =
@@ -96,32 +108,38 @@ fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
 
 -- | Figure out if a path exists relative to the file it came from. Check if a
 -- path exists with extension, with reRelativization, with rerel and extension.
+-- It's like reRelativize, but "smart" in that it tries a few things and can
+-- test if the filepath exists.
 smartRelativizePath ::
   (Monad m) =>
+  -- | Function to test if a filepath is valid
   (FilePath -> m Bool) ->
+  -- | Default extension
+  DefaultExtension ->
+  -- | The source path to use as the relativization root
   FilePath ->
-  FilePath ->
+  -- | The path to relativize, relative to the source path
   FilePath ->
   m FilePath
 smartRelativizePath tester defaultExtension source dest = do
   let destWithExtension = dest -<.> defaultExtension
   destWithExtensionResult <- maybeTester tester destWithExtension
-  rereled <- maybeTester tester $ reRelativize source dest
+  rereled <- maybeTester tester $ trace'' "rereled:" $ reRelativize source dest
   rereledWithExtension <-
     maybeTester tester $
       reRelativize source destWithExtension
   return
-    . fromMaybe dest
-    $ destWithExtensionResult
-      <|> rereled
-      <|> rereledWithExtension
+    . fromMaybe (trace' dest)
+    $ trace' destWithExtensionResult
+      <|> trace' rereled
+      <|> trace' rereledWithExtension
 
 maybeTester :: (Monad m) => (a -> m Bool) -> a -> m (Maybe a)
 maybeTester tester a = do
   test <- tester a
   return $ if test then Just a else Nothing
 
-tryExt :: FilePath -> FilePath -> MaybeT IO FilePath
+tryExt :: DefaultExtension -> FilePath -> MaybeT IO FilePath
 tryExt defExt dest = MaybeT $ maybeFile $ dest <.> defExt
 
 tryRerel :: FilePath -> FilePath -> MaybeT IO FilePath
@@ -129,7 +147,7 @@ tryRerel source dest = MaybeT $ do
   found <- maybeFile $ reRelativize source dest
   return $ trace'' "tryrerel" found
 
-tryRerelExt :: FilePath -> FilePath -> FilePath -> MaybeT IO FilePath
+tryRerelExt :: DefaultExtension -> FilePath -> FilePath -> MaybeT IO FilePath
 tryRerelExt defExt source dest =
   MaybeT $ maybeFile $ reRelativize source (dest <.> defExt)
 
@@ -142,7 +160,7 @@ maybeDirectory dir = maybeTester D.doesDirectoryExist dir
 -- | Find documents in library and return them with FilePaths relative to the
 -- library
 findDocuments ::
-  (Traversable f, Foldable f) => FilePath -> f FilePath -> IO [File]
+  (Traversable f, Foldable f) => DefaultExtension -> f FilePath -> IO [File]
 findDocuments defaultExt sourcePaths = do
   join . catMaybes . toList <$> T.mapM (traverseDir defaultExt) sourcePaths
 

@@ -1,14 +1,20 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Eta reduce" #-}
 import qualified Constants
 import Control.Exception (evaluate)
+import qualified Control.Exception as E
+import Control.Monad (unless)
 import Control.Monad.Except (runExceptT)
-import Control.Monad.Reader (ReaderT (runReaderT))
+import Control.Monad.Identity (Identity (runIdentity))
+import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
+import Data.Either (fromRight, isRight)
 import qualified Data.Text as T
 import Database.Persist.Sqlite (runSqlPersistM, wrapConnection)
 import Database.Sqlite (open)
-import MdGraph (mdGraph)
+import MdGraph (mdGraph, rerelativizeLink)
+import qualified MdGraph
 import MdGraph.App (App (runApp), Env (Env))
 import MdGraph.App.Arguments (Arguments (..))
 import qualified MdGraph.App.Arguments as Arguments
@@ -17,8 +23,11 @@ import qualified MdGraph.App.Command as Command
 import qualified MdGraph.App.LogLevel as LogLevel
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config (Config (Config, libraryPath))
-import MdGraph.File.Internal
+import MdGraph.File (Files (..))
+import MdGraph.File.Internal (AbsolutePath (..), File, fixLink, reRelativize)
+import MdGraph.Node (Link (..))
 import qualified MdGraph.TagDirection as TagDirection
+import Spec.Base
 import System.Directory (getCurrentDirectory)
 import System.FilePath
 import Test.Hspec
@@ -26,56 +35,133 @@ import Test.Hspec.Contrib.HUnit
 import Test.Hspec.QuickCheck
 import Prelude
 
+data FakeFiles = FakeFiles
+  { ffTrueAbsolutePath :: FilePath -> FilePath,
+    ffMaybeFile :: FilePath -> (Maybe FilePath),
+    ffFindDocuments :: [File],
+    ffRelativizeWithExtension :: FilePath -> FilePath -> FilePath,
+    ffGetQualifiedDocumentPath :: FilePath -> FilePath
+  }
+
+newtype FilesMock a = FilesMock {runFilesMock :: ReaderT FakeFiles Identity a}
+  deriving (Monad, Functor, Applicative, MonadReader FakeFiles)
+
+instance Files FilesMock where
+  trueAbsolutePath a = asks ffTrueAbsolutePath <*> pure a
+  maybeFile a = asks ffMaybeFile <*> pure a
+  findDocuments = asks ffFindDocuments
+  relativizeWithExtension source dest = do
+    fn <- asks ffRelativizeWithExtension
+    return $ fn source dest
+  getQualifiedDocumentPath a = do
+    fn <- asks ffGetQualifiedDocumentPath
+    return $ fn a
+
+filesMock :: FakeFiles
+filesMock = FakeFiles id Just [] (\a b -> b) id
+
 main :: IO ()
 main = do
   libraryDir <- getLibraryDir
   hspec $ do
     describe "Backlinks" $ do
       it "Correct backlinks are returned" $ do
-        let command = Backlinks (BacklinkOptions [FileTarget $ libraryDir </> "link chain 4.md"] 2)
+        let command = Backlinks (BacklinkOptions [FileTarget $ libraryDir </> Constants.linkChain4_md] 2)
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args `shouldReturn` Right ["link chain 3.md", "link chain 4.md"]
+        mdGraph args `shouldReturn` Right [Constants.linkChain3_md, Constants.linkChain4_md]
 
     describe "Subgraph" $ do
       it "Return the full subgraph of a file" $ do
         let command =
               Subgraph $
                 SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> "link chain 1.md"],
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md],
                     sgInclNonex = False,
                     sgInclStatic = False,
                     sgTagDir = TagDirection.In,
                     sgDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args `shouldReturn` Right ["link chain 1.md", "link chain 2.md", "link chain 3.md", "link chain 4.md"]
+        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md, Constants.linkChain4_md]
+
+      it "Nonexistent (broken) links are included if requested" $ do
+        let command =
+              Subgraph $
+                SubgraphOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasNonExistentLink_md],
+                    sgInclNonex = True,
+                    sgInclStatic = False,
+                    sgTagDir = TagDirection.In,
+                    sgDepth = -1
+                  }
+        let args = defaultSpecArgs {argCommand = command}
+        mdGraph args >>= outputContains ["link-to-nonexistent-file.md"]
+
+      it "Nonexistent (broken) links are _not_ included if not requested" $ do
+        let command =
+              Subgraph $
+                SubgraphOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasNonExistentLink_md],
+                    sgInclNonex = False,
+                    sgInclStatic = False,
+                    sgTagDir = TagDirection.In,
+                    sgDepth = -1
+                  }
+        let args = defaultSpecArgs {argCommand = command}
+        mdGraph args >>= outputDoesNotContain ["link-to-nonexistent-file.md"]
+
+      it "Static files (ie files not recognized as documents) are included if requested" $ do
+        let command =
+              Subgraph $
+                SubgraphOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasStaticFileLink_md],
+                    sgInclNonex = False,
+                    sgInclStatic = True,
+                    sgTagDir = TagDirection.In,
+                    sgDepth = -1
+                  }
+        let args = defaultSpecArgs {argCommand = command}
+        mdGraph args >>= outputContains [Constants.static_txt]
+
+      it "Static files (ie files not recognized as documents) are _not_ included if not requested" $ do
+        let command =
+              Subgraph $
+                SubgraphOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasStaticFileLink_md],
+                    sgInclNonex = False,
+                    sgInclStatic = False,
+                    sgTagDir = TagDirection.In,
+                    sgDepth = -1
+                  }
+        let args = defaultSpecArgs {argCommand = command}
+        mdGraph args >>= outputDoesNotContain [Constants.static_txt]
 
     describe "Path handling" $ do
       it "Absolute paths are accepted and relativized to the library" $ do
         let command =
               Subgraph $
                 SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> "link chain 1.md"],
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md],
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
                     sgDepth = 1
                   }
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains "link chain 1.md"
+        mdGraph args >>= outputContains [Constants.linkChain1_md]
 
       it "Paths relative to the current directory are accepted and relativized to the library" $ do
         let command =
               Subgraph $
                 SubgraphOptions
-                  { sgTargets = [FileTarget $ "./test/library" </> "link chain 1.md"],
+                  { sgTargets = [FileTarget $ "./test/library" </> Constants.linkChain1_md],
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
                     sgDepth = 1
                   }
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains "link chain 1.md"
+        mdGraph args >>= outputContains [Constants.linkChain1_md]
 
       it "Relative directory traversals are resolved and simplified" $ do
         let command =
@@ -101,26 +187,26 @@ main = do
                     sgDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains Constants.parent_md
+        mdGraph args >>= outputContains [Constants.parent_md]
 
     describe "Orphans" $ do
       it "Files with no links to or from them are identified" $ do
         let args = defaultSpecArgs {argCommand = Command.Orphans}
-        mdGraph args >>= outputContains Constants.orphan_md
+        mdGraph args >>= outputContains [Constants.orphan_md]
 
       it "Orphan files are not identified as unreachable" $ do
         let args = defaultSpecArgs {argCommand = Command.Unreachable}
-        mdGraph args >>= outputDoesNotContains Constants.orphan_md
+        mdGraph args >>= outputDoesNotContain [Constants.orphan_md]
 
     describe "Unreachable" $ do
       it "Files that have links but have no links to them are identified" $ do
         let args = defaultSpecArgs {argCommand = Command.Unreachable}
-        mdGraph args >>= outputContains Constants.unreachable_md
+        mdGraph args >>= outputContains [Constants.unreachable_md]
 
     describe "Nonexistent" $ do
       it "Files" $ do
         let args = defaultSpecArgs {argCommand = Command.Nonexes}
-        mdGraph args >>= outputContains "this-goes-nowhere.md"
+        mdGraph args >>= outputContains ["link-to-nonexistent-file.md"]
 
     describe "Parsing" $ do
       it "File extensions in links may be omitted and the default is used instead" $ do
@@ -134,7 +220,7 @@ main = do
                     sgDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains Constants.parent_md
+        mdGraph args >>= outputContains [Constants.parent_md]
 
       it "Links may use angle brackets and hint text" $ do
         let command =
@@ -147,45 +233,21 @@ main = do
                     sgDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains Constants.parent_md
+        mdGraph args >>= outputContains [Constants.parent_md]
 
-getLibraryDir :: IO FilePath
-getLibraryDir = do
-  curDir <- getCurrentDirectory
-  return $ curDir </> "test" </> "library"
+      -- We need to ensure that the links in a file are relativized even if they're static links
+      -- Need to expose function that processes and fixes parse results
+      it "Static link targets are relativized" $ do
+        let maybeFile "/foo/baz.md" = Just "/foo/baz.md"
+            maybeFile a = Nothing
+        -- maybeFile a = Just a
+        let mockOverload = filesMock {ffMaybeFile = maybeFile}
+        let result = runIdentity . flip runReaderT mockOverload . runFilesMock $ rerelativizeLink mempty "" (AbsolutePath "/foo/bar.md") (Link "../baz.md" "Text")
+        -- linkPath result `shouldBe` "/foo/baz.md"
+        -- reRelativize "/foo/bar.md" "../baz.md" `shouldBe` "/baz.md"
+        -- reRelativize "/foo/bar.md" "./baz.md" `shouldBe` "/foo/baz.md"
+        fixLink "md" "/foo/bar.md" "./baz.md" `shouldReturn` "/foo/baz.md"
 
-defaultSpecArgs :: Arguments
-defaultSpecArgs =
-  Arguments
-    { argLibrary = "./test/library",
-      argDefExt = "md",
-      argDatabase = Arguments.DbFile ":memory:",
-      argLogLevel = LogLevel.None,
-      argCommand = Command.Populate
-    }
-
-aoeu source dest = trueDest </> joinDir absoluteParts
-  where
-    sourceParts = splitDirectories source
-    destParts = splitDirectories dest
-    isRelativePart = (== "..")
-    relativeParts = length . takeWhile isRelativePart $ destParts
-    absoluteParts = dropWhile isRelativePart destParts
-    trueDest = joinDir $ reverse . drop relativeParts . reverse $ sourceParts
-
-shouldContainIO :: (HasCallStack, Show a, Eq a) => IO [a] -> [a] -> Expectation
-action `shouldContainIO` expected = action >>= (`shouldContain` expected)
-
-shouldReturnFrom :: (HasCallStack, Show a, Eq a) => a -> IO a -> Expectation
-shouldReturnFrom = flip shouldReturn
-
--- -- shouldRight :: Either l r -> IO r
--- -- shouldRight e =
-satisfiesRight :: (Show l, Show r) => (r -> Bool) -> Either l r -> Expectation
-satisfiesRight test eith = shouldSatisfy eith $ either (const False) test
-
-outputContains :: String -> Either T.Text [String] -> Expectation
-outputContains value output = satisfiesRight (Prelude.elem value) output
-
-outputDoesNotContains :: String -> Either T.Text [String] -> Expectation
-outputDoesNotContains value output = satisfiesRight (Prelude.notElem value) output
+-- Link targets are rebased onto their source file "baz.md" referenced from "/library/foo/bar.md" becomes "/library/foo/baz.md"
+-- Link targets are normalised (leading "./" is removed)
+-- Link target are made absolute

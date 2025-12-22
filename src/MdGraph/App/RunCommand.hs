@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -14,10 +15,14 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (asks)
 import qualified Data.Foldable as F
 import Data.HashSet as S
+import Data.Hashable (Hashable)
 import qualified Data.List as L
+import qualified Data.List as List
 import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import Database.Persist (Entity (entityVal))
+import GHC.Generics (Generic)
+import GHC.IO.Encoding (getForeignEncoding)
 import MdGraph.App
   ( App,
     Env (config),
@@ -79,53 +84,97 @@ runNonexistent = do
     T.unwords ["Found", T.pack . show . length $ nonexes, "nonexistent"]
   return $ entityVal <$> nonexes
 
+-- | Resolve a document if possible, otherwise return the edge
+data SgResult = SgEdge {unSgEdge :: FilePath} | SgDocument {unSgDocument :: FilePath}
+  deriving (Show, Eq, Generic)
+
+instance Hashable SgResult
+
+sgResultPath :: SgResult -> FilePath
+sgResultPath (SgEdge path) = path
+sgResultPath (SgDocument path) = path
+
+isDocument :: SgResult -> Bool
+isDocument (SgDocument _) = True
+isDocument _ = False
+
 runSubgraph ::
   (Monad m, Queries m, Logs m, Files m, HasConfig m) =>
   SubgraphOptions ->
   m [FilePath]
-runSubgraph options@SubgraphOptions {sgTargets, sgDepth} = do
+runSubgraph options@SubgraphOptions {sgTargets, sgDepth, sgInclNonex, sgInclStatic} = do
   logInfo . T.unwords $ ["Finding subgraphs"]
   paths <-
     F.foldrM
-      (flip $ runSubgraphOnArg getForwardLinks sgDepth)
+      (flip $ runSubgraphOnArg linkGetter sgDepth)
       S.empty
       sgTargets
-  return $ S.toList paths
 
-type LinkGetter m = FilePath -> m [Entity Document]
+  -- If not inclNonex and not inclStatic, only return SgDocuments
+  -- If inclStatic, return SgDocuments and SgEdges where the path exists (will need to absolutize that path)
+  -- If inclNonex
+  return $ Prelude.map sgResultPath $ S.toList paths
+  where
+    linkGetter path = do
+      queryResults <- getForwardLinks path
+      let childPaths = Prelude.map (either (SgEdge . edgeHead . entityVal) (SgDocument . documentPath . entityVal)) queryResults
+      return childPaths
+    processResults ::
+      (Monad m, Files m) =>
+      [SgResult] -> -- results
+      Bool -> -- includeNonex
+      Bool -> -- includeStatic
+      m [SgResult]
+    processResults results includeNonex@True includeStatic@True = return results
+    processResults results includeNonex@False includeStatic@False = return $ List.filter isDocument results
+    processResults results includeNonex@True includeStatic@False = do
+      let (docs, edges) = List.partition isDocument results
+      -- let aoeu =
+      -- Shit are static links relativized to the library before we insert them into the database? No, they aren't.
+      return undefined
+
+-- | Gets the children of the provided path
+type LinkGetter m = FilePath -> m [SgResult]
 
 runSubgraphOnArg ::
   (Monad m, HasConfig m, Files m) =>
   LinkGetter m ->
   Integer ->
-  HashSet FilePath ->
+  HashSet SgResult -> -- foundPaths
   SubgraphTarget ->
-  m (HashSet FilePath)
+  m (HashSet SgResult)
 runSubgraphOnArg linkGetter maxDepth foundPaths (FileTarget path) = do
   libPath <- libraryPath <$> getConfig
-  absPath <- trueAbsolutePath path
-  let relPath = makeRelative libPath absPath
+  targetAbsolutePath <- trueAbsolutePath path
+  -- Making this an SgDocument feels a little dirty because that implies we know it exists...
+  let relPath = SgDocument $ makeRelative libPath targetAbsolutePath
+
   -- TODO: fix infinite depth to be a real value instead of this hack
   runSubgraphPath' linkGetter maxDepth 0 foundPaths relPath
-runSubgraphOnArg _ _ _ _ = pure S.empty -- TODO
+runSubgraphOnArg _ _ _ _ = pure S.empty -- TODO: support tag subgraphs
 
 runSubgraphPath' ::
   (Monad m) =>
   LinkGetter m ->
+  -- | MaxDepth
   Integer ->
+  -- | Current depth
   Integer ->
-  S.HashSet FilePath ->
-  FilePath ->
-  m (HashSet FilePath)
+  -- | All previously found paths
+  S.HashSet SgResult ->
+  -- | The target file to find the subgraph of
+  SgResult ->
+  m (S.HashSet SgResult)
 runSubgraphPath' linkGetter maxDepth currentDepth foundPaths newPath = do
   let alreadyExists = S.member newPath foundPaths
       pastMaxDepth = currentDepth == maxDepth
   if alreadyExists || pastMaxDepth
-    then pure foundPaths
+    then return foundPaths
     else do
-      children <- linkGetter newPath
       let setWithCurrent = S.insert newPath foundPaths
-      let childPaths = documentPath . entityVal <$> children
+
+      childPaths <- linkGetter $ sgResultPath newPath
+
       F.foldrM
         (flip $ runSubgraphPath' linkGetter maxDepth (currentDepth + 1))
         setWithCurrent
@@ -136,7 +185,12 @@ runBacklinks options@BacklinkOptions {blTargets, blDepth} = do
   logInfo . T.unwords $ ["Finding backlinks"]
   paths <-
     F.foldrM
-      (flip $ runSubgraphOnArg getBackwardLinks blDepth)
+      (flip $ runSubgraphOnArg linkGetter blDepth)
       S.empty
       blTargets
-  return $ S.toList paths
+  return . List.map sgResultPath . S.toList $ paths
+  where
+    linkGetter path = do
+      queryResults <- getBackwardLinks path
+      let childPaths = Prelude.map (SgDocument . documentPath . entityVal) queryResults
+      return childPaths

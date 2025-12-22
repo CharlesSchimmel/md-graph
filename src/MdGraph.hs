@@ -4,6 +4,7 @@
 
 module MdGraph
   ( mdGraph,
+    rerelativizeLink,
   )
 where
 
@@ -18,6 +19,7 @@ import Control.Monad
   ( forM,
     join,
   )
+import qualified Control.Monad as Monad
 import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Identity (Identity (..))
@@ -26,10 +28,12 @@ import Control.Monad.Reader
     asks,
   )
 import Control.Monad.Trans.Reader (ReaderT (runReaderT))
-import Data.Either (rights)
+import Data.Either (partitionEithers, rights)
+import qualified Data.Either as Either
 import Data.Foldable as F
   ( mapM_,
   )
+import qualified Data.Foldable as Foldable
 import Data.HashSet as S
   ( HashSet,
     fromList,
@@ -38,6 +42,7 @@ import Data.HashSet as S
   )
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes)
+import qualified Data.Maybe as Maybe
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Database.Persist.Sqlite
@@ -122,13 +127,13 @@ prepareDatabase = do
 
   -- find documents
   logDebug "Finding documents"
-  files <- findDocuments
-  let totalCt = P.length files
-      relativeFileMap = M.fromList' relativePath files
+  foundDocuments <- findDocuments
+  let totalCt = P.length foundDocuments
+      relativeFileMap = M.fromList' relativePath foundDocuments
 
   -- load all found documents into temp
   logDebug "Populating TempDocuments"
-  insertTempDocuments $ Mapper.fromFile <$> files
+  insertTempDocuments $ Mapper.fromFile <$> foundDocuments
 
   logDebug "Pruning deleted Documents"
   deletedCt <- pruneDeletedDocuments
@@ -160,39 +165,38 @@ prepareDatabase = do
   logDebug "Parsing new and modified Documents"
   logDebug . T.pack . show $ M.keys docKeyMap
 
-  rawParseResults <-
-    mapToSndM
-      (parseDocument . absolutePath . fst)
-      filesAndDocumentToParse
-  let rewrappedResults =
-        P.map
-          (\((file, document), eith) -> (file,document,) <$> eith)
-          rawParseResults
-  let postParseCtxs =
-        ( \(file, document, ParseResult {tags, links}) ->
-            PostParseCtx
-              { ppcDocument = document,
-                ppcFile = file,
-                ppcTag = tags,
-                ppcLinks = links
-              }
-        )
-          <$> rights rewrappedResults
+  parseErrorOrContext <- Monad.forM filesAndDocumentToParse $ \(file, document) -> do
+    parseErrorOrResult <- parseDocument . absolutePath $ file
+    return $ do
+      -- Either Monad
+      ParseResult {tags, links} <- parseErrorOrResult
+      Right $
+        PostParseCtx
+          { ppcDocument = document,
+            ppcFile = file,
+            ppcTag = tags,
+            ppcLinks = links
+          }
 
-  -- -- TODO: Log out parse failures
+  let (parseErrors, postParseCtxs) = Either.partitionEithers parseErrorOrContext
 
-  let knownRealPaths = S.fromList $ unAbsolutePath . absolutePath <$> files
+  Monad.when (Foldable.length parseErrors > 0) $ do
+    logError "Failed to parse some files" -- TODO add more detail
+  let knownDocumentPaths = S.fromList $ unAbsolutePath . absolutePath <$> foundDocuments
 
-  -- The links have absolute paths to the real files (if the link resolves)
-  let ctxAndItsAbsoluteLinks =
-        mapToSnd
-          (mkAbsoluteLinks knownRealPaths defaultExtension)
-          postParseCtxs
+  -- For all of the parse results, convert their links into absolute links
+  ctxAndItsAbsoluteLinks <- Monad.forM postParseCtxs $ \ppc -> do
+    absoluteLinks <- mkAbsoluteLinks knownDocumentPaths defaultExtension ppc
+    return (ppc, absoluteLinks)
+
+  -- Unroll the list of PostParseCtxs and their links, and flatMap it to pair
+  -- every ppcDocument with each of its Links
+  -- [(doc,[link])] -> [(doc,link)]
   let docKeyAndAbsoluteLinks =
-        ctxAndItsAbsoluteLinks
-          >>= ( \(PostParseCtx {ppcDocument}, links) ->
-                  (ppcDocument,) <$> links
-              )
+        do
+          (PostParseCtx {ppcDocument}, links) <- ctxAndItsAbsoluteLinks
+          link <- links
+          [(ppcDocument, link)]
 
   -- The links have paths relative to their file
   let docKeyAndRelativeLinks =
@@ -228,14 +232,17 @@ reportDocumentCount num reason = do
 
 -- | For a ParseResult, try to rerelativize its Links relative to the parsed
 -- file's absolute path
+-- | TODO: Should this be relativizing to the library root? Is it?
 mkAbsoluteLinks ::
-  S.HashSet FilePath -> FilePath -> PostParseCtx -> [AbsoluteLink]
-mkAbsoluteLinks knownPaths defaultExtension ctx@PostParseCtx {ppcLinks, ppcFile} =
-  AbsoluteLink <$> newLinks
-  where
-    newLinks =
-      rerelativizeLink knownPaths defaultExtension (absolutePath ppcFile)
-        <$> ppcLinks
+  (Monad m, Files m) =>
+  S.HashSet FilePath ->
+  FilePath ->
+  PostParseCtx ->
+  m [AbsoluteLink]
+mkAbsoluteLinks knownPaths defaultExtension ctx@PostParseCtx {ppcLinks, ppcFile} = do
+  let relativizer = rerelativizeLink knownPaths defaultExtension (absolutePath ppcFile)
+  newLinks <- Monad.mapM relativizer ppcLinks
+  return $ AbsoluteLink <$> newLinks
 
 mkRelativeLinks :: FilePath -> AbsoluteLink -> RelativeLink
 mkRelativeLinks libraryPath (AbsoluteLink link@Link {linkPath, linkText}) =
@@ -252,17 +259,28 @@ mkRelativeLinks libraryPath (AbsoluteLink link@Link {linkPath, linkText}) =
 -- | Using a set of known real files, check if the Link's path can be coerced
 -- into matching one of those real file paths
 rerelativizeLink ::
-  S.HashSet FilePath -> FilePath -> AbsolutePath -> Link -> Link
-rerelativizeLink knownPaths defaultExtension (AbsolutePath sourcePath) link@Link {linkPath} =
-  link {linkPath = newPath}
+  forall m.
+  (Monad m, Files m) =>
+  -- | Known filepaths
+  S.HashSet FilePath ->
+  -- | Default extension to try
+  FilePath ->
+  -- | The source path to rerelativize against (if foo.md has a link to ../bar.md, foo.md is the source)
+  AbsolutePath ->
+  -- | The link te rerelativize
+  Link ->
+  m Link
+rerelativizeLink knownPaths defaultExtension (AbsolutePath sourcePath) link@Link {linkPath} = do
+  newPath <- smartRelativizePath linkTester defaultExtension sourcePath linkPath
+  return $ link {linkPath = newPath}
   where
-    newPath =
-      runIdentity $
-        smartRelativizePath
-          (\f -> Identity $ S.member f knownPaths)
-          defaultExtension
-          sourcePath
-          linkPath
+    linkTester :: (Monad m, Files m) => FilePath -> m Bool
+    linkTester path =
+      if S.member path knownPaths
+        then return True
+        else do
+          i <- maybeFile path
+          return $ Maybe.isJust i
 
 data PostParseCtx = PostParseCtx
   { ppcFile :: File,

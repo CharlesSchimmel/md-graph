@@ -58,7 +58,7 @@ instance PreparesDb App where
 class Queries m where
   getOrphans :: m [Entity Document]
   getUnreachables :: m [Entity Document]
-  getForwardLinks :: FilePath -> m [Entity Document]
+  getForwardLinks :: FilePath -> m [Either (Entity Edge) (Entity Document)]
   getBackwardLinks :: FilePath -> m [Entity Document]
   getNonexistents :: m [Entity Edge]
 

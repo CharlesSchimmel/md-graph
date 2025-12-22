@@ -28,13 +28,11 @@ import Control.Monad.Reader
   ( MonadIO (liftIO),
     MonadReader (ask),
     ReaderT,
-    asks,
-    local,
   )
 import Data.Int (Int64)
 import qualified Data.List as List
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Data.Text (Text (..))
 import Data.Text as T
 import Database.Esqueleto.Experimental
@@ -205,6 +203,7 @@ unreachableM =
       from
     $ (filesThatHaveLinks `except_` filesThatAreLinkedTo)
 
+-- | This should support static files too
 backwardLinks :: FilePath -> Query [Entity Document]
 backwardLinks docPath = select $ do
   (childDoc :& edge :& parentDoc) <-
@@ -217,7 +216,42 @@ backwardLinks docPath = select $ do
   where_ (childDoc ^. DocumentPath ==. val docPath)
   pure parentDoc
 
-forwardLinks :: FilePath -> Query [Entity Document]
+-- Can't distinguish between static files and nonexistent files. Their edges will be recorded, but neither of them will have records in the Document table. I guess we could grab the documents that we can find, and filter nonexistent and static files in/out after doing the query. Or we could store the Document type
+forwardLinks' :: FilePath -> Query [Entity Edge]
+forwardLinks' docPath = do
+  edges <- select $ do
+    (edge :& parentDoc) <-
+      from $
+        table @Edge
+          `innerJoin` table @Document
+            `on` (\(edge :& parentDoc') -> parentDoc' ^. DocumentId ==. edge ^. EdgeTail)
+    -- `leftJoin` table @Document
+    --   `on` ( \(_ :& edge :& doc) ->
+    --            just (edge ^. EdgeHead) ==. doc ?. DocumentPath
+    --        )
+    where_ (parentDoc ^. DocumentPath ==. val docPath)
+    pure edge
+  return edges
+
+-- forwardLinks :: FilePath -> Query [Entity Edge]
+-- forwardLinks docPath = do
+--   edges <- select $ do
+--     (parentDoc :& edge) <-
+--       from $
+--         table @Document
+--           `innerJoin` table @Edge
+--             `on` (\(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail)
+--           -- `leftJoin` table @Document
+--           --   `on` ( \(_ :& edge :& doc) ->
+--           --            just (edge ^. EdgeHead) ==. doc ?. DocumentPath
+--           --        )
+--     where_ (parentDoc ^. DocumentPath ==. val docPath)
+--     pure edge
+--   return $ catMaybes edges
+
+-- | For a given document path, finds its outgoing edges. If the edge points to
+-- a document, returns that (Right). Otherwise returns the Edge (Left)
+forwardLinks :: FilePath -> Query [Either (Entity Edge) (Entity Document)]
 forwardLinks docPath = do
   documents <- select $ do
     (parentDoc :& edge :& childDoc) <-
@@ -230,8 +264,11 @@ forwardLinks docPath = do
                      just (edge ^. EdgeHead) ==. doc ?. DocumentPath
                  )
     where_ (parentDoc ^. DocumentPath ==. val docPath)
-    pure childDoc
-  return $ catMaybes documents
+    -- let aoeu = maybe (Left edge) Right childDoc
+    pure (childDoc, edge)
+  -- return $ catMaybes documents
+  let documentOrEdge = Prelude.map (\(doc, edge) -> maybe (Left edge) Right doc) documents
+  return documentOrEdge
 
 -- | Edges without associated files
 nonexistent :: Query [Entity Edge]

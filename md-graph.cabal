@@ -155,6 +155,7 @@ test-suite md-graph-test
   main-is: Spec.hs
   other-modules:
       Constants
+      Spec.Base
       Paths_md_graph
   hs-source-dirs:
       test
