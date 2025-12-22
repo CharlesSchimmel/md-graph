@@ -72,13 +72,13 @@ type RebasedFilePath = FilePath
 -- -- "/foo/bar/qux.md"
 -- TODO: Enforce source and dest as absolute _files_ (not dirs?)?
 -- TODO: Detilde before reaching this function
-unrelativize :: Internal.AbsolutePath -> Internal.DestFilePath -> IO Internal.AbsolutePath
+unrelativize :: Internal.AbsolutePath -> Internal.DestFilePath -> Internal.AbsolutePath
 unrelativize (Internal.AbsolutePath source) dest
-  | isAbsolute dest = return $ Internal.AbsolutePath dest
-  | otherwise = do
-      let sourceDir = takeDirectory source
-          unnormalisedDestDir = sourceDir </> dest
-      return . normaliseEvil $ Internal.AbsolutePath unnormalisedDestDir
+  | isAbsolute dest = Internal.AbsolutePath dest
+  | otherwise = normaliseEvil $ Internal.AbsolutePath unnormalisedDestDir
+  where
+    sourceDir = takeDirectory source
+    unnormalisedDestDir = sourceDir </> dest
 
 -- | Normalise "./" and "../" in an absolute filepathh
 -- This function is "evil" because it doesn't handle symlinks. In the real world /foo/../bar is not necessarily /bar.
@@ -89,7 +89,9 @@ normaliseEvil (Internal.AbsolutePath path) = Internal.AbsolutePath . foldl (</>)
   where
     -- normaliseEvil (Internal.AbsolutePath path) = Internal.AbsolutePath . show $ _normalise [] parts
 
-    parts = splitDirectories path
+    -- System.FilePath.normalise handles a lot of stuff other than simplifying ./
+    basicallyNormal = normalise path
+    parts = splitDirectories basicallyNormal
     _normalise :: [FilePath] -> [FilePath] -> [FilePath]
     _normalise (prev : acc) (".." : rem) = _normalise acc rem
     _normalise [] (".." : rem) = _normalise [] rem

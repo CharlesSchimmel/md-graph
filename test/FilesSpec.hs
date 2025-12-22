@@ -14,7 +14,7 @@ import Data.Either (fromRight, isRight)
 import qualified Data.Text as T
 import Database.Persist.Sqlite (runSqlPersistM, wrapConnection)
 import Database.Sqlite (open)
-import MdGraph (mdGraph, rerelativizeLink)
+import MdGraph (mdGraph)
 import qualified MdGraph
 import MdGraph.App (App (runApp), Env (Env))
 import MdGraph.App.Arguments (Arguments (..))
@@ -25,7 +25,7 @@ import qualified MdGraph.App.LogLevel as LogLevel
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config (Config (Config, libraryPath))
 import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
-import MdGraph.File.Internal (AbsolutePath (..), File, fixLink, reRelativize)
+import MdGraph.File.Internal (AbsolutePath (..), File)
 import MdGraph.Node (Link (..))
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base
@@ -61,13 +61,14 @@ spec = do
         normaliseEvil (AbsolutePath "/foo/../../../../bar.md") `shouldBe` AbsolutePath "/bar.md"
       it "Circular traversals are simplified" $ do
         normaliseEvil (AbsolutePath "/foo/../foo/../foo/../foo/../bar.md") `shouldBe` AbsolutePath "/bar.md"
+    -- TODO: some of the cases from https://hackage.haskell.org/package/filepath-1.5.4.0/docs/System-FilePath.html#v:normalise
 
     it "Unrelativize" $ do
-      unrelativize (AbsolutePath "/foo/bar/baz.md") "./qux.md" `shouldReturn` AbsolutePath "/foo/bar/qux.md"
-      unrelativize (AbsolutePath "/foo/bar/baz.md") "../qux.md" `shouldReturn` AbsolutePath "/foo/qux.md"
-      unrelativize (AbsolutePath "/foo/bar/baz.md") "./subdir/qux.md" `shouldReturn` AbsolutePath "/foo/bar/subdir/qux.md"
-      unrelativize (AbsolutePath "/foo/bar/baz.md") "../subdir/qux.md" `shouldReturn` AbsolutePath "/foo/subdir/qux.md"
-      unrelativize (AbsolutePath "/foo/bar/baz.md") "./qux.md" `shouldReturn` AbsolutePath "/foo/bar/qux.md"
+      unrelativize (AbsolutePath "/foo/bar/baz.md") "./qux.md" `shouldBe` AbsolutePath "/foo/bar/qux.md"
+      unrelativize (AbsolutePath "/foo/bar/baz.md") "../qux.md" `shouldBe` AbsolutePath "/foo/qux.md"
+      unrelativize (AbsolutePath "/foo/bar/baz.md") "./subdir/qux.md" `shouldBe` AbsolutePath "/foo/bar/subdir/qux.md"
+      unrelativize (AbsolutePath "/foo/bar/baz.md") "../subdir/qux.md" `shouldBe` AbsolutePath "/foo/subdir/qux.md"
+      unrelativize (AbsolutePath "/foo/bar/baz.md") "./qux.md" `shouldBe` AbsolutePath "/foo/bar/qux.md"
 
     it "isAncestorOf" $ do
       isAncestorOf (AbsolutePath "/foo/bar") (AbsolutePath "/foo/bar/baz.md") `shouldBe` True

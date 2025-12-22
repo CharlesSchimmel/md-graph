@@ -52,6 +52,7 @@ data FileResult = FileResult
 
 data File = File
   { absolutePath :: AbsolutePath,
+    -- TODO: I don't know why this is part of this record. We can figure out the relative path after getting all of the files.
     relativePath :: RelativePath,
     modificationTime :: UTCTime
   }
@@ -96,44 +97,6 @@ reRelativize sourceFile destination
 -- TODO: why not joinPath?
 joinDir [] = ""
 joinDir paths = P.foldr1 (</>) paths
-
--- | Figure out if a path exists relative to the file it came from. Check if a
--- path exists with extension, with reRelativization, with rerel and extension.
-fixLink :: DefaultExtension -> SourceFilePath -> DestFilePath -> IO DestFilePath
-fixLink defaultExtension source dest = fromMaybe dest <$> runMaybeT result
-  where
-    result =
-      (normalise <$> tryExt defaultExtension dest)
-        <|> (normalise <$> tryRerel source dest)
-        <|> tryRerelExt defaultExtension source dest
-
--- | Figure out if a path exists relative to the file it came from. Check if a
--- path exists with extension, with reRelativization, with rerel and extension.
--- It's like reRelativize, but "smart" in that it tries a few things and can
--- test if the filepath exists.
-smartRelativizePath ::
-  (Monad m) =>
-  -- | Function to test if a filepath is valid
-  (FilePath -> m Bool) ->
-  -- | Default extension
-  DefaultExtension ->
-  -- | The source path to use as the relativization root
-  FilePath ->
-  -- | The path to relativize, relative to the source path
-  FilePath ->
-  m FilePath
-smartRelativizePath tester defaultExtension source dest = do
-  let destWithExtension = dest -<.> defaultExtension
-  destWithExtensionResult <- maybeTester tester destWithExtension
-  rereled <- maybeTester tester $ trace'' "rereled:" $ reRelativize source dest
-  rereledWithExtension <-
-    maybeTester tester $
-      reRelativize source destWithExtension
-  return
-    . fromMaybe (trace' dest)
-    $ trace' destWithExtensionResult
-      <|> trace' rereled
-      <|> trace' rereledWithExtension
 
 maybeTester :: (Monad m) => (a -> m Bool) -> a -> m (Maybe a)
 maybeTester tester a = do

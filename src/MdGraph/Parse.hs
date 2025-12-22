@@ -35,7 +35,6 @@ import MdGraph.Config
   )
 import MdGraph.File.Internal
   ( AbsolutePath (AbsolutePath),
-    fixLink,
   )
 import MdGraph.Node
 import MdGraph.Parse.Pandoc

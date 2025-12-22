@@ -4,7 +4,6 @@
 
 module MdGraph
   ( mdGraph,
-    rerelativizeLink,
   )
 where
 
@@ -57,12 +56,11 @@ import MdGraph.App.Command (Command)
 import MdGraph.App.Logger
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config
-import MdGraph.File (Files (..))
+import MdGraph.File (Files (..), unrelativize)
 import MdGraph.File.Internal
   ( AbsolutePath (..),
     File (..),
     RelativePath (..),
-    smartRelativizePath,
   )
 import MdGraph.Node (Link (..))
 import MdGraph.Node as Node
@@ -84,6 +82,7 @@ import MdGraph.Util (trace'')
 import Options.Applicative
 import System.FilePath
   ( makeRelative,
+    (-<.>),
     (<.>),
     (</>),
   )
@@ -183,25 +182,13 @@ prepareDatabase = do
     logError "Failed to parse some files" -- TODO add more detail
   let knownDocumentPaths = S.fromList $ unAbsolutePath . absolutePath <$> foundDocuments
 
-  -- For all of the parse results, convert their links into absolute links
-  ctxAndItsAbsoluteLinks <- Monad.forM postParseCtxs $ \ppc -> do
-    absoluteLinks <- mkAbsoluteLinks knownDocumentPaths defaultExtension ppc
-    return (ppc, absoluteLinks)
+  let documentsAndAbsoluteLinks = postParseCtxs >>= unrollUnrelativizeLinks
 
-  -- Unroll the list of PostParseCtxs and their links, and flatMap it to pair
-  -- every ppcDocument with each of its Links
-  -- [(doc,[link])] -> [(doc,link)]
-  let docKeyAndAbsoluteLinks =
-        do
-          (PostParseCtx {ppcDocument}, links) <- ctxAndItsAbsoluteLinks
-          link <- links
-          [(ppcDocument, link)]
+  documentAndRelativeLinks <- Monad.forM documentsAndAbsoluteLinks $ \(doc, link) -> do
+    relativeLink <- mkLinksRelativeToLibrary link
+    return (doc, relativeLink)
 
-  -- The links have paths relative to their file
-  let docKeyAndRelativeLinks =
-        fmap (mkRelativeLinks libraryPath) <$> docKeyAndAbsoluteLinks
-
-  let newEdges = uncurry Mapper.toEdge <$> docKeyAndRelativeLinks
+  let newEdges = uncurry Mapper.toEdge <$> documentAndRelativeLinks
 
   logInfo
     . T.unwords
@@ -229,57 +216,41 @@ reportDocumentCount num reason = do
   logInfo . T.unwords $ [T.pack . show $ num, reason]
   pure ()
 
--- | For a ParseResult, try to rerelativize its Links relative to the parsed
--- file's absolute path
--- | TODO: Should this be relativizing to the library root? Is it?
-mkAbsoluteLinks ::
-  (Monad m, Files m) =>
-  S.HashSet FilePath ->
-  FilePath ->
-  PostParseCtx ->
-  m [AbsoluteLink]
-mkAbsoluteLinks knownPaths defaultExtension ctx@PostParseCtx {ppcLinks, ppcFile} = do
-  let relativizer = rerelativizeLink knownPaths defaultExtension (absolutePath ppcFile)
-  newLinks <- Monad.mapM relativizer ppcLinks
-  return $ AbsoluteLink <$> newLinks
+unrollUnrelativizeLinks :: PostParseCtx -> [(Key Document, AbsoluteLink)]
+unrollUnrelativizeLinks PostParseCtx {ppcFile, ppcDocument, ppcLinks} = do
+  link <- ppcLinks
+  let (File {absolutePath = sourcePath}) = ppcFile
+  [(ppcDocument, unrelativizeLink sourcePath link)]
 
-mkRelativeLinks :: FilePath -> AbsoluteLink -> RelativeLink
-mkRelativeLinks libraryPath (AbsoluteLink link@Link {linkPath, linkText}) =
-  RelativeLink $
+-- | Use a Link's source file path to unrelativize the Link path.
+unrelativizeLink :: AbsolutePath -> Link -> AbsoluteLink
+unrelativizeLink path link@(Link {linkPath}) = AbsoluteLink $ link {linkPath = unrelativizedPath}
+  where
+    unrelativizedPath = unAbsolutePath $ unrelativize path linkPath
+
+-- | Links don't necessarily have or need a file extension. Check if a link's
+-- path exists when we append the default extension. If it does, use that
+-- instead.
+-- TODO: Use the list of known files, too? It would probably be faster than disk access.
+tryAddingLinkExtension ::
+  (Monad m, Files m, HasConfig m) =>
+  AbsoluteLink ->
+  m AbsoluteLink
+tryAddingLinkExtension (AbsoluteLink link@(Link {linkPath})) = do
+  Config {defaultExtension} <- getConfig
+
+  existsWithExtension <- maybeFile $ linkPath -<.> defaultExtension
+  let defaultBackToOrig = Maybe.fromMaybe linkPath existsWithExtension
+  return . AbsoluteLink $ link {linkPath = defaultBackToOrig}
+
+mkLinksRelativeToLibrary :: (Monad m, HasConfig m) => AbsoluteLink -> m RelativeLink
+mkLinksRelativeToLibrary (AbsoluteLink link@Link {linkPath, linkText}) = do
+  Config {libraryPath} <- getConfig
+  return . RelativeLink $
     Link
       { linkText = linkText,
         linkPath = makeRelative libraryPath linkPath
       }
-
--- Take the list of known files
--- Take the parsed links
--- Try rerelativising the parsed links, and if that new link is in known files, update it.
-
--- | Using a set of known real files, check if the Link's path can be coerced
--- into matching one of those real file paths
-rerelativizeLink ::
-  forall m.
-  (Monad m, Files m) =>
-  -- | Known filepaths
-  S.HashSet FilePath ->
-  -- | Default extension to try
-  FilePath ->
-  -- | The source path to rerelativize against (if foo.md has a link to ../bar.md, foo.md is the source)
-  AbsolutePath ->
-  -- | The link te rerelativize
-  Link ->
-  m Link
-rerelativizeLink knownPaths defaultExtension (AbsolutePath sourcePath) link@Link {linkPath} = do
-  newPath <- smartRelativizePath linkTester defaultExtension sourcePath linkPath
-  return $ link {linkPath = newPath}
-  where
-    linkTester :: (Monad m, Files m) => FilePath -> m Bool
-    linkTester path =
-      if S.member path knownPaths
-        then return $ trace'' "known path" True
-        else do
-          i <- maybeFile path
-          return $ Maybe.isJust i
 
 data PostParseCtx = PostParseCtx
   { ppcFile :: File,

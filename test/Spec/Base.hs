@@ -7,6 +7,7 @@ import Control.Monad (unless)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Data.Either (fromRight, isRight)
+import qualified Data.List as List
 import qualified Data.Text as T
 import Database.Persist.Sqlite (runSqlPersistM, wrapConnection)
 import Database.Sqlite (open)
@@ -46,12 +47,16 @@ defaultSpecArgs =
 shouldReturnFrom :: (HasCallStack, Show a, Eq a) => a -> IO a -> Expectation
 shouldReturnFrom = flip shouldReturn
 
-outputContains :: (HasCallStack, Show a, Show r, Eq r) => [r] -> Either a [r] -> Expectation
+outputContains :: (HasCallStack, Show a, Show r, Eq r, Ord r) => [r] -> Either a [r] -> Expectation
 outputContains expected eitherList = do
-  let liftedExpectation = (`shouldContain` expected) <$> eitherList
+  let orderedExpected = List.sort expected
+  let orderedEither = List.sort <$> eitherList
+  let liftedExpectation = (`shouldContain` orderedExpected) <$> orderedEither
   fromRight (shouldSatisfy eitherList isRight) liftedExpectation
 
-outputDoesNotContain :: (HasCallStack, Show a, Show r, Eq r) => [r] -> Either a [r] -> Expectation
+outputDoesNotContain :: (HasCallStack, Show a, Show r, Eq r, Ord r) => [r] -> Either a [r] -> Expectation
 outputDoesNotContain expected eitherList = do
-  let liftedExpectation = (`shouldNotContain` expected) <$> eitherList
+  let orderedExpected = List.sort expected
+  let orderedEither = List.sort <$> eitherList
+  let liftedExpectation = (`shouldNotContain` orderedExpected) <$> orderedEither
   fromRight (shouldSatisfy eitherList isRight) liftedExpectation

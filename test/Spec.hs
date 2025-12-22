@@ -14,7 +14,7 @@ import qualified Data.Text as T
 import Database.Persist.Sqlite (runSqlPersistM, wrapConnection)
 import Database.Sqlite (open)
 import qualified FilesSpec
-import MdGraph (mdGraph, rerelativizeLink)
+import MdGraph (mdGraph)
 import qualified MdGraph
 import MdGraph.App (App (runApp), Env (Env))
 import MdGraph.App.Arguments (Arguments (..))
@@ -25,7 +25,7 @@ import qualified MdGraph.App.LogLevel as LogLevel
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config (Config (Config, libraryPath))
 import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
-import MdGraph.File.Internal (AbsolutePath (..), File, fixLink, reRelativize)
+import MdGraph.File.Internal (AbsolutePath (..), File)
 import MdGraph.Node (Link (..))
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base
@@ -228,20 +228,3 @@ main = do
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
-
-      -- We need to ensure that the links in a file are relativized even if they're static links
-      -- Need to expose function that processes and fixes parse results
-      it "Static link targets are relativized" $ do
-        let maybeFile "/foo/baz.md" = Just "/foo/baz.md"
-            maybeFile a = Nothing
-        -- maybeFile a = Just a
-        let mockOverload = filesMock {ffMaybeFile = maybeFile}
-        let result = runIdentity . flip runReaderT mockOverload . runFilesMock $ rerelativizeLink mempty "" (AbsolutePath "/foo/bar.md") (Link "../baz.md" "Text")
-        -- linkPath result `shouldBe` "/foo/baz.md"
-        -- reRelativize "/foo/bar.md" "../baz.md" `shouldBe` "/baz.md"
-        -- reRelativize "/foo/bar.md" "./baz.md" `shouldBe` "/foo/baz.md"
-        fixLink "md" "/foo/bar.md" "./baz.md" `shouldReturn` "/foo/baz.md"
-
--- Link targets are rebased onto their source file "baz.md" referenced from "/library/foo/bar.md" becomes "/library/foo/baz.md"
--- Link targets are normalised (leading "./" is removed)
--- Link target are made absolute
