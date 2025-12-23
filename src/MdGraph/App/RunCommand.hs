@@ -1,13 +1,15 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 
 module MdGraph.App.RunCommand where
 
 import Aux.HashSet
-import Control.Applicative (Applicative (liftA2))
+import Control.Applicative (Alternative ((<|>)), Applicative (liftA2))
 import Control.Exception (throwIO)
 import Control.Monad (join)
+import qualified Control.Monad as Monad
 import Control.Monad.Except
   ( MonadError (throwError),
   )
@@ -34,14 +36,11 @@ import MdGraph.App.Logger
     logInfo,
   )
 import MdGraph.Config
-  ( Config
-      ( dbConnString,
-        libraryPath
-      ),
+  ( Config (..),
     HasConfig (getConfig),
   )
 import MdGraph.File
-  ( Files,
+  ( Files (maybeFile),
     trueAbsolutePath,
   )
 import MdGraph.Persist.Class (Queries (..))
@@ -53,7 +52,7 @@ import qualified MdGraph.Persist.Schema as Edge
 import MdGraph.TagDirection
 import MdGraph.Util (trace'')
 import System.Directory (canonicalizePath)
-import System.FilePath (makeRelative)
+import System.FilePath (makeRelative, (</>))
 
 runCommand :: Command -> App [String]
 runCommand Orphans = fmap documentPath <$> runOrphans
@@ -99,39 +98,61 @@ isDocument (SgDocument _) = True
 isDocument _ = False
 
 runSubgraph ::
+  forall m.
   (Monad m, Queries m, Logs m, Files m, HasConfig m) =>
   SubgraphOptions ->
   m [FilePath]
 runSubgraph options@SubgraphOptions {sgTargets, sgDepth, sgInclNonex, sgInclStatic} = do
   logInfo . T.unwords $ ["Finding subgraphs"]
-  paths <-
+  pathsSet <-
     F.foldrM
       (flip $ runSubgraphOnArg linkGetter sgDepth)
       S.empty
       sgTargets
+  let paths = S.toList pathsSet
+  filteredResults <- processResults paths sgInclNonex sgInclStatic
 
   -- If not inclNonex and not inclStatic, only return SgDocuments
   -- If inclStatic, return SgDocuments and SgEdges where the path exists (will need to absolutize that path)
   -- If inclNonex
-  return $ Prelude.map sgResultPath $ S.toList paths
+  return $ Prelude.map sgResultPath filteredResults
   where
     linkGetter path = do
       queryResults <- getForwardLinks path
       let childPaths = Prelude.map (either (SgEdge . edgeHead . entityVal) (SgDocument . documentPath . entityVal)) queryResults
       return childPaths
     processResults ::
-      (Monad m, Files m) =>
+      (Monad m, Files m, HasConfig m) =>
       [SgResult] -> -- results
       Bool -> -- includeNonex
       Bool -> -- includeStatic
       m [SgResult]
     processResults results includeNonex@True includeStatic@True = return results
     processResults results includeNonex@False includeStatic@False = return $ List.filter isDocument results
+    processResults results includeNonex@False includeStatic@True = do
+      Config {libraryPath} <- getConfig
+      tryResolveEdgePaths <- Monad.forM results $ \case
+        doc@(SgDocument docPath) -> return $ Just doc
+        edge@(SgEdge edgePath) -> do
+          plainPath <- maybeFile edgePath
+          libraryEdgePath <- maybeFile $ libraryPath </> edgePath
+          -- We're not actually trying to get the real path here, we just want to
+          -- see if the file exists and then return the edgepath.
+          return $ (edge <$ (plainPath <|> libraryEdgePath))
+      return $ catMaybes tryResolveEdgePaths
     processResults results includeNonex@True includeStatic@False = do
-      let (docs, edges) = List.partition isDocument results
-      -- let aoeu =
-      -- Shit are static links relativized to the library before we insert them into the database? No, they aren't.
-      return undefined
+      Config {libraryPath} <- getConfig
+      tryResolveEdgePaths <- Monad.forM results $ \case
+        doc@(SgDocument docPath) -> return $ Just doc
+        edge@(SgEdge edgePath) -> do
+          plainPath <- maybeFile edgePath
+          libraryEdgePath <- maybeFile $ libraryPath </> edgePath
+          -- In this case, we _want_ the nonexistent edges, so we're flipping
+          -- the maybe. (If the edge exists and it's `Just a` then flip it to
+          -- Nothing).
+          let edgeExists = plainPath <|> libraryEdgePath
+          return $ maybe (Just edge) (const Nothing) edgeExists
+      return $ catMaybes tryResolveEdgePaths
 
 -- | Gets the children of the provided path
 type LinkGetter m = FilePath -> m [SgResult]

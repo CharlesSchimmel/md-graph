@@ -78,7 +78,7 @@ import MdGraph.Persist.Schema
     migrateAll,
     migrateMdGraph,
   )
-import MdGraph.Util (trace'')
+import qualified MdGraph.Persist.Schema as Schema
 import Options.Applicative
 import System.FilePath
   ( makeRelative,
@@ -127,7 +127,7 @@ prepareDatabase = do
   logDebug "Finding documents"
   foundDocuments <- findDocuments
   let totalCt = P.length foundDocuments
-      relativeFileMap = M.fromList' relativePath foundDocuments
+  let relativeFileMap = M.fromList' relativePath foundDocuments
 
   -- load all found documents into temp
   logDebug "Populating TempDocuments"
@@ -157,12 +157,39 @@ prepareDatabase = do
   newDocs <- insertDocuments docsToInsert
 
   let docKeyMap = M.flop (RelativePath . documentPath) newDocs
-      filesAndDocumentToParse =
-        M.elems $ M.unionZip relativeFileMap docKeyMap
 
   logDebug "Parsing new and modified Documents"
   logDebug . T.pack . show $ M.keys docKeyMap
 
+  let filesAndDocumentToParse = M.elems $ M.unionZip relativeFileMap docKeyMap
+
+  (newEdges, newTags) <- doParseDocuments filesAndDocumentToParse
+
+  logInfo
+    . T.unwords
+    $ ["Found", T.pack . show . P.length $ newEdges, "new edges"]
+
+  logDebug . T.pack . show $ newEdges
+  logDebug "Inserting new edges"
+  insertEdges newEdges
+
+  logInfo
+    . T.unwords
+    $ ["Found", T.pack . show . P.length $ newTags, "new tags"]
+  logDebug "Inserting new tags"
+  insertTags newTags
+
+  pure ()
+
+reportDocumentCount num reason = do
+  logInfo . T.unwords $ [T.pack . show $ num, reason]
+  pure ()
+
+doParseDocuments ::
+  (Monad m, HasConfig m, Logs m, Files m, Parses m) =>
+  [(File, Key Document)] ->
+  m ([Edge], [Schema.Tag])
+doParseDocuments filesAndDocumentToParse = do
   parseErrorOrContext <- Monad.forM filesAndDocumentToParse $ \(file, document) -> do
     parseErrorOrResult <- parseDocument . absolutePath $ file
     return $ do
@@ -180,41 +207,21 @@ prepareDatabase = do
 
   Monad.when (Foldable.length parseErrors > 0) $ do
     logError "Failed to parse some files" -- TODO add more detail
-  let knownDocumentPaths = S.fromList $ unAbsolutePath . absolutePath <$> foundDocuments
-
   let documentsAndAbsoluteLinks = postParseCtxs >>= unrollUnrelativizeLinks
 
-  documentAndRelativeLinks <- Monad.forM documentsAndAbsoluteLinks $ \(doc, link) -> do
-    relativeLink <- mkLinksRelativeToLibrary link
+  documentAndRelativeLinksWithExtensions <- Monad.forM documentsAndAbsoluteLinks $ \(doc, link) -> do
+    linkWithExtension <- tryAddingLinkExtension link
+    relativeLink <- mkLinksRelativeToLibrary linkWithExtension
     return (doc, relativeLink)
 
-  let newEdges = uncurry Mapper.toEdge <$> documentAndRelativeLinks
-
-  logInfo
-    . T.unwords
-    $ ["Found", T.pack . show . P.length $ newEdges, "new edges"]
-
-  logDebug . T.pack . show $ newEdges
-  logDebug "Inserting new edges"
-  insertEdges newEdges
+  let newEdges = uncurry Mapper.toEdge <$> documentAndRelativeLinksWithExtensions
 
   let newTags =
         postParseCtxs
           >>= ( \PostParseCtx {ppcTag, ppcDocument} ->
                   Mapper.toTag ppcDocument <$> ppcTag
               )
-
-  logInfo
-    . T.unwords
-    $ ["Found", T.pack . show . P.length $ newTags, "new tags"]
-  logDebug "Inserting new tags"
-  insertTags newTags
-
-  pure ()
-
-reportDocumentCount num reason = do
-  logInfo . T.unwords $ [T.pack . show $ num, reason]
-  pure ()
+  return (newEdges, newTags)
 
 unrollUnrelativizeLinks :: PostParseCtx -> [(Key Document, AbsoluteLink)]
 unrollUnrelativizeLinks PostParseCtx {ppcFile, ppcDocument, ppcLinks} = do

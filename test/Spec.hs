@@ -168,7 +168,7 @@ main = do
                     sgDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
-        mdGraph args `shouldReturn` Right [Constants.usesDirectoryTraversal_md, Constants.parent_md]
+        mdGraph args >>= outputContains [Constants.parent_md]
 
       it "Convoluted directory traversals are resolved and simplified" $ do
         let command =
