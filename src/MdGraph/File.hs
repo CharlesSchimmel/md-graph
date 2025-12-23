@@ -39,14 +39,13 @@ instance Files App where
     config@Config {..} <- getConfig
     liftIO $ Internal.findDocuments defaultExtension [libraryPath]
 
-type RebasedFilePath = FilePath
-
--- -- | When an "source" file references a "dest" file, it may reference it
--- -- relative to itself. For example, the source file "/foo/bar/baz.md" might
--- -- reference the destination "qux.md". We need the destination's path to become
--- -- "/foo/bar/qux.md"
 -- TODO: Enforce source and dest as absolute _files_ (not dirs?)?
 -- TODO: Detilde before reaching this function
+
+-- | When an "source" file references a "dest" file, it may reference it
+-- relative to itself. For example, the source file "\/foo\/bar\/baz.md" might
+-- reference the destination "qux.md". We need the destination's path to become
+-- "\/foo\/bar\/qux.md"
 unrelativize :: AbsolutePath -> DestFilePath -> AbsolutePath
 unrelativize (AbsolutePath source) dest
   | FilePath.isAbsolute dest = AbsolutePath dest
@@ -55,9 +54,10 @@ unrelativize (AbsolutePath source) dest
     sourceDir = FilePath.takeDirectory source
     unnormalisedDestDir = sourceDir FilePath.</> dest
 
+-- TODO: Just use canonicalizePath from System.Directory? That handles symlinks. It doesn't collapse the directory if it doesn't exist though, which doesn't work for testing.
+
 -- | Normalise "./" and "../" in an absolute filepathh
 -- This function is "evil" because it doesn't handle symlinks. In the real world /foo/../bar is not necessarily /bar.
--- TODO: Just use canonicalizePath from System.Directory? That handles symlinks. It doesn't collapse the directory if it doesn't exist though, which doesn't work for testing.
 normaliseEvil :: AbsolutePath -> AbsolutePath
 normaliseEvil (AbsolutePath path) =
   let firstPassNormalisation = FilePath.normalise path -- System.FilePath.normalise handles more than just simplifying "./"
@@ -73,7 +73,7 @@ normaliseEvil (AbsolutePath path) =
     _normalise acc (cur : rem) = _normalise (cur : acc) rem
     _normalise acc [] = reverse acc
 
--- | Check if parentPath is in the tree of childPath, ex /foo is in an ancestor of /foo/bar.md
+-- | Check if parentPath is in the tree of childPath, ex `\/foo` is in an ancestor of \/foo\/bar.md
 isAncestorOf :: AbsolutePath -> AbsolutePath -> Bool
 isAncestorOf (AbsolutePath parentPath) (AbsolutePath childPath) =
   let parentDirs = FilePath.splitDirectories parentPath

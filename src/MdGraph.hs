@@ -79,15 +79,7 @@ import System.FilePath
     (<.>),
     (</>),
   )
-import Prelude
 import Prelude as P
-  ( foldr,
-    length,
-    map,
-    mapM,
-    print,
-    putStrLn,
-  )
 
 mdGraph :: Arguments -> IO (Either T.Text [String])
 mdGraph args@Arguments {argCommand} = do
@@ -215,7 +207,7 @@ doParseDocuments filesAndDocumentToParse = do
           >>= ( \PostParseCtx {ppcTag, ppcDocument} ->
                   Mapper.toTag ppcDocument <$> ppcTag
               )
-  return (newEdges, newTags)
+  return $ (newEdges, newTags)
 
 unrollUnrelativizeLinks :: PostParseCtx -> [(Key Document, AbsoluteLink)]
 unrollUnrelativizeLinks PostParseCtx {ppcFile, ppcDocument, ppcLinks} = do

@@ -110,7 +110,7 @@ runSubgraph options@SubgraphOptions {sgTargets, sgDepth, sgInclNonex, sgInclStat
       S.empty
       sgTargets
   let paths = S.toList pathsSet
-  filteredResults <- processResults paths sgInclNonex sgInclStatic
+  filteredResults <- processResults paths options
 
   -- If not inclNonex and not inclStatic, only return SgDocuments
   -- If inclStatic, return SgDocuments and SgEdges where the path exists (will need to absolutize that path)
@@ -124,12 +124,11 @@ runSubgraph options@SubgraphOptions {sgTargets, sgDepth, sgInclNonex, sgInclStat
     processResults ::
       (Monad m, Files m, HasConfig m) =>
       [SgResult] -> -- results
-      Bool -> -- includeNonex
-      Bool -> -- includeStatic
+      SubgraphOptions ->
       m [SgResult]
-    processResults results includeNonex@True includeStatic@True = return results
-    processResults results includeNonex@False includeStatic@False = return $ List.filter isDocument results
-    processResults results includeNonex@False includeStatic@True = do
+    processResults results SubgraphOptions {sgInclNonex = True, sgInclStatic = True} = return results
+    processResults results SubgraphOptions {sgInclNonex = False, sgInclStatic = False} = return $ List.filter isDocument results
+    processResults results SubgraphOptions {sgInclNonex = False, sgInclStatic = True} = do
       Config {libraryPath} <- getConfig
       tryResolveEdgePaths <- Monad.forM results $ \case
         doc@(SgDocument docPath) -> return $ Just doc
@@ -140,7 +139,7 @@ runSubgraph options@SubgraphOptions {sgTargets, sgDepth, sgInclNonex, sgInclStat
           -- see if the file exists and then return the edgepath.
           return $ (edge <$ (plainPath <|> libraryEdgePath))
       return $ catMaybes tryResolveEdgePaths
-    processResults results includeNonex@True includeStatic@False = do
+    processResults results SubgraphOptions {sgInclNonex = True, sgInclStatic = False} = do
       Config {libraryPath} <- getConfig
       tryResolveEdgePaths <- Monad.forM results $ \case
         doc@(SgDocument docPath) -> return $ Just doc
