@@ -1,0 +1,6 @@
+- ignore:
+    name: "Eta reduce"
+- ignore:
+    name: "Redundant return"
+- ignore:
+    name: "Redundant $"
