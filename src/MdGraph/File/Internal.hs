@@ -10,17 +10,17 @@
 
 module MdGraph.File.Internal where
 
+import Aux.Common (maybeTester)
 import Control.Applicative
 import Control.Concurrent.Async (mapConcurrently)
-import Control.Monad (join)
+import Control.Monad as Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (asks)
 import Control.Monad.Trans.Maybe
 import Data.Foldable
 import Data.Hashable (Hashable)
-import qualified Data.List as L
+import qualified Data.List as List
 import Data.Maybe
-import Data.Text as T
 import Data.Time (UTCTime)
 import Data.Traversable as T
 import GHC.Generics (Generic)
@@ -69,10 +69,6 @@ type SourceFilePath = FilePath
 
 type DestFilePath = FilePath
 
--- TODO? does not support oddly placed parent-traversal like `foo/bar/baz/../file-in-bar.md`
--- On the other hand, neither does System.Directory's canonicalizePath. See https://neilmitchell.blogspot.com/2015/10/filepaths-are-subtle-symlinks-are-hard.html
--- We know that the destination must be accessible from the library root, so we could use findFileWith to get the library-relative path
-
 -- | If a destination path has parent directory traversal (../), flatten it
 -- with its source to remove the directory traversal
 reRelativize :: SourceFilePath -> DestFilePath -> FilePath
@@ -84,36 +80,19 @@ reRelativize sourceFile destination
     destParts = splitDirectories destination
     isRelativePart = (== doubleDot)
     -- \| Just the double dots
-    numRelativeParts = L.length . L.takeWhile isRelativePart $ destParts
+    numRelativeParts = List.length . List.takeWhile isRelativePart $ destParts
     -- \| The actually useful parts of the destination path that aren't double
     -- dots
-    absoluteParts = L.dropWhile isRelativePart destParts
+    absoluteParts = List.dropWhile isRelativePart destParts
     -- \| Take the source path parts (all of the directory names that comprise the
     -- full path); remove directories from the end equal to the number of '..'
     -- in the relative destination.
     trueDest =
-      joinDir $ L.reverse . L.drop numRelativeParts . L.reverse $ sourceParts
+      joinDir $ List.reverse . List.drop numRelativeParts . List.reverse $ sourceParts
 
 -- TODO: why not joinPath?
 joinDir [] = ""
 joinDir paths = P.foldr1 (</>) paths
-
-maybeTester :: (Monad m) => (a -> m Bool) -> a -> m (Maybe a)
-maybeTester tester a = do
-  test <- tester a
-  return $ if test then Just a else Nothing
-
-tryExt :: DefaultExtension -> FilePath -> MaybeT IO FilePath
-tryExt defExt dest = MaybeT $ maybeFile $ dest <.> defExt
-
-tryRerel :: FilePath -> FilePath -> MaybeT IO FilePath
-tryRerel source dest = MaybeT $ do
-  found <- maybeFile $ reRelativize source dest
-  return $ trace'' "tryrerel" found
-
-tryRerelExt :: DefaultExtension -> FilePath -> FilePath -> MaybeT IO FilePath
-tryRerelExt defExt source dest =
-  MaybeT $ maybeFile $ reRelativize source (dest <.> defExt)
 
 maybeFile :: FilePath -> IO (Maybe FilePath)
 maybeFile file = maybeTester D.doesFileExist file
@@ -126,7 +105,7 @@ maybeDirectory dir = maybeTester D.doesDirectoryExist dir
 findDocuments ::
   (Traversable f, Foldable f) => DefaultExtension -> f FilePath -> IO [File]
 findDocuments defaultExt sourcePaths = do
-  join . catMaybes . toList <$> T.mapM (traverseDir defaultExt) sourcePaths
+  Monad.join . catMaybes . toList <$> T.mapM (traverseDir defaultExt) sourcePaths
 
 data PathType = F FilePath | D FilePath deriving (Show)
 
@@ -165,8 +144,7 @@ expand extension (D path) = do
 
 -- | canonicalize path and also convert tilde home directory reference to actual
 trueAbsolutePathIO :: FilePath -> IO FilePath
-trueAbsolutePathIO path = do
-  detilde path >>= makeAbsolute
+trueAbsolutePathIO path = detilde path >>= makeAbsolute
 
 -- TODO: shouldn't the shell expand this before passing it in?
 detilde :: FilePath -> IO FilePath

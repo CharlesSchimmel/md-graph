@@ -17,3 +17,8 @@ batch batchSize list = headBatch : batch batchSize remainder
 
 unbool :: (a -> Bool) -> a -> Maybe a
 unbool test a = if test a then Just a else Nothing
+
+maybeTester :: (Monad m) => (a -> m Bool) -> a -> m (Maybe a)
+maybeTester tester a = do
+  test <- tester a
+  return $ if test then Just a else Nothing

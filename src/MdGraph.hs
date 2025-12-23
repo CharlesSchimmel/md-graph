@@ -14,10 +14,6 @@ import Aux.Tuple
     mapToSndM,
   )
 import Control.Concurrent.Async (mapConcurrently)
-import Control.Monad
-  ( forM,
-    join,
-  )
 import qualified Control.Monad as Monad
 import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -39,6 +35,7 @@ import Data.HashSet as S
     member,
     toList,
   )
+import qualified Data.HashSet as HashSet
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes)
 import qualified Data.Maybe as Maybe
@@ -56,7 +53,7 @@ import MdGraph.App.Command (Command)
 import MdGraph.App.Logger
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config
-import MdGraph.File (Files (..), unrelativize)
+import MdGraph.File (AbsolutePath (..), Files (..), RelativePath (..), unrelativize)
 import MdGraph.File.Internal
   ( AbsolutePath (..),
     File (..),
@@ -100,7 +97,7 @@ mdGraph :: Arguments -> IO (Either T.Text [String])
 mdGraph args@Arguments {argCommand} = do
   conf <- runExceptT $ argsToConfig args
   -- TODO: Better error handling here
-  join <$> mapM withConf conf
+  Monad.join <$> mapM withConf conf
   where
     withConf conf = do
       conn <- open $ dbConnString conf
@@ -209,8 +206,9 @@ doParseDocuments filesAndDocumentToParse = do
     logError "Failed to parse some files" -- TODO add more detail
   let documentsAndAbsoluteLinks = postParseCtxs >>= unrollUnrelativizeLinks
 
+  let knownFilePaths = HashSet.fromList $ map (\(File {absolutePath}, _) -> unAbsolutePath absolutePath) filesAndDocumentToParse
   documentAndRelativeLinksWithExtensions <- Monad.forM documentsAndAbsoluteLinks $ \(doc, link) -> do
-    linkWithExtension <- tryAddingLinkExtension link
+    linkWithExtension <- addExtensionIfFileExists knownFilePaths link
     relativeLink <- mkLinksRelativeToLibrary linkWithExtension
     return (doc, relativeLink)
 
@@ -238,17 +236,34 @@ unrelativizeLink path link@(Link {linkPath}) = AbsoluteLink $ link {linkPath = u
 -- | Links don't necessarily have or need a file extension. Check if a link's
 -- path exists when we append the default extension. If it does, use that
 -- instead.
--- TODO: Use the list of known files, too? It would probably be faster than disk access.
-tryAddingLinkExtension ::
+addExtensionIfFileExists ::
   (Monad m, Files m, HasConfig m) =>
+  HashSet FilePath ->
   AbsoluteLink ->
   m AbsoluteLink
-tryAddingLinkExtension (AbsoluteLink link@(Link {linkPath})) = do
+addExtensionIfFileExists knownFiles (AbsoluteLink link@(Link {linkPath})) = do
   Config {defaultExtension} <- getConfig
 
-  existsWithExtension <- maybeFile $ linkPath -<.> defaultExtension
-  let defaultBackToOrig = Maybe.fromMaybe linkPath existsWithExtension
-  return . AbsoluteLink $ link {linkPath = defaultBackToOrig}
+  pathExistsUnmodified <- checkPathExists knownFiles linkPath
+
+  let pathWithExtension = linkPath -<.> defaultExtension
+  pathExistsWithExtension <- checkPathExists knownFiles pathWithExtension
+
+  let pathExists = pathExistsUnmodified <|> pathExistsWithExtension
+  let checkedLink =
+        maybe link (\checkedPath -> link {linkPath = checkedPath}) pathExists
+  return . AbsoluteLink $ checkedLink
+
+checkPathExists ::
+  (Monad m, Files m) =>
+  HashSet FilePath ->
+  FilePath ->
+  m (Maybe FilePath)
+checkPathExists knownPaths path = do
+  let pathAlreadyDiscovered = if S.member path knownPaths then Just path else Nothing
+
+  pathExistsOnFilesystem <- maybeFile path
+  return $ pathAlreadyDiscovered <|> pathExistsOnFilesystem
 
 mkLinksRelativeToLibrary :: (Monad m, HasConfig m) => AbsoluteLink -> m RelativeLink
 mkLinksRelativeToLibrary (AbsoluteLink link@Link {linkPath, linkText}) = do
@@ -256,6 +271,9 @@ mkLinksRelativeToLibrary (AbsoluteLink link@Link {linkPath, linkText}) = do
   return . RelativeLink $
     Link
       { linkText = linkText,
+        -- What if the linkPath isn't a descendent of the library? I don't
+        -- think it matters, in that case it should be some other absolute
+        -- path.
         linkPath = makeRelative libraryPath linkPath
       }
 
