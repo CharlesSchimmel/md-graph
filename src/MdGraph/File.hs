@@ -3,7 +3,7 @@
 {-# HLINT ignore "Use uncurry" #-}
 module MdGraph.File
   ( Files (..),
-    Internal.AbsolutePath (..),
+    AbsolutePath (..),
     Internal.RelativePath (..),
     normaliseEvil,
     unrelativize,
@@ -11,34 +11,16 @@ module MdGraph.File
   )
 where
 
-import Control.Applicative
-import Control.Concurrent.Async (mapConcurrently)
-import Control.Monad (join)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (asks)
-import Control.Monad.Trans.Maybe
-import Data.Foldable
-import Data.Hashable (Hashable)
-import qualified Data.List
-import Data.Maybe
-import Data.Text as T
-  ( pack,
-    unwords,
-  )
-import Data.Time (UTCTime)
-import Data.Traversable as T
 import MdGraph.App (App (App))
-import MdGraph.App.Logger (logDebug)
 import MdGraph.Config
   ( Config (..),
     HasConfig (getConfig),
   )
-import MdGraph.File.Internal (File (..))
+import MdGraph.File.Internal (AbsolutePath (..), File (..), RelativePath (..))
 import qualified MdGraph.File.Internal as Internal
-import MdGraph.Util (trace')
-import System.Directory as D
-import System.FilePath as F
-import Prelude as P
+import System.FilePath
+import qualified System.FilePath as FilePath
 
 class Files m where
   -- | Detilde and ensure the given path is absolute. Does not check for file existence.
@@ -55,11 +37,6 @@ instance Files App where
   maybeFile = liftIO . Internal.maybeFile
 
   -- Never used
-  -- relativizeWithExtension source dest = do
-  --   Config {defaultExtension} <- getConfig
-  --   fixedLink <- liftIO $ Internal.fixLink defaultExtension source dest
-  --   logDebug . T.pack . show $ fixedLink
-  --   return fixedLink
   findDocuments = do
     config@Config {..} <- getConfig
     liftIO $ Internal.findDocuments defaultExtension [libraryPath]
@@ -72,26 +49,25 @@ type RebasedFilePath = FilePath
 -- -- "/foo/bar/qux.md"
 -- TODO: Enforce source and dest as absolute _files_ (not dirs?)?
 -- TODO: Detilde before reaching this function
-unrelativize :: Internal.AbsolutePath -> Internal.DestFilePath -> Internal.AbsolutePath
-unrelativize (Internal.AbsolutePath source) dest
-  | isAbsolute dest = Internal.AbsolutePath dest
-  | otherwise = normaliseEvil $ Internal.AbsolutePath unnormalisedDestDir
+unrelativize :: AbsolutePath -> Internal.DestFilePath -> AbsolutePath
+unrelativize (AbsolutePath source) dest
+  | FilePath.isAbsolute dest = AbsolutePath dest
+  | otherwise = normaliseEvil $ AbsolutePath unnormalisedDestDir
   where
-    sourceDir = takeDirectory source
-    unnormalisedDestDir = sourceDir </> dest
+    sourceDir = FilePath.takeDirectory source
+    unnormalisedDestDir = sourceDir FilePath.</> dest
 
 -- | Normalise "./" and "../" in an absolute filepathh
 -- This function is "evil" because it doesn't handle symlinks. In the real world /foo/../bar is not necessarily /bar.
 -- TODO: Just use canonicalizePath from System.Directory? That handles symlinks. It doesn't collapse the directory if it doesn't exist though, which doesn't work for testing.
-normaliseEvil :: Internal.AbsolutePath -> Internal.AbsolutePath
--- normaliseEvil (Internal.AbsolutePath path) = Internal.AbsolutePath . foldl (</>) "" $ _normalise [] parts
-normaliseEvil (Internal.AbsolutePath path) = Internal.AbsolutePath . foldl (</>) "/" $ _normalise [] parts
+normaliseEvil :: AbsolutePath -> AbsolutePath
+normaliseEvil (AbsolutePath path) =
+  let firstPassNormalisation = FilePath.normalise path -- System.FilePath.normalise handles more than just simplifying "./"
+      pathParts = FilePath.splitDirectories firstPassNormalisation
+      fullyNormalisedParts = _normalise [] pathParts
+      rebuiltPath = foldl (</>) "/" fullyNormalisedParts
+   in AbsolutePath rebuiltPath
   where
-    -- normaliseEvil (Internal.AbsolutePath path) = Internal.AbsolutePath . show $ _normalise [] parts
-
-    -- System.FilePath.normalise handles a lot of stuff other than simplifying ./
-    basicallyNormal = normalise path
-    parts = splitDirectories basicallyNormal
     _normalise :: [FilePath] -> [FilePath] -> [FilePath]
     _normalise (prev : acc) (".." : rem) = _normalise acc rem
     _normalise [] (".." : rem) = _normalise [] rem
@@ -100,10 +76,10 @@ normaliseEvil (Internal.AbsolutePath path) = Internal.AbsolutePath . foldl (</>)
     _normalise acc [] = reverse acc
 
 -- | Check if parentPath is in the tree of childPath, ex /foo is in an ancestor of /foo/bar.md
-isAncestorOf :: Internal.AbsolutePath -> Internal.AbsolutePath -> Bool
-isAncestorOf (Internal.AbsolutePath parentPath) (Internal.AbsolutePath childPath) = length parentDirs == length commonDirs
-  where
-    parentDirs = splitDirectories parentPath
-    childDirs = splitDirectories childPath
-    zipped = zip parentDirs childDirs
-    commonDirs = takeWhile (\(parentDir, childDir) -> parentDir == childDir) zipped
+isAncestorOf :: AbsolutePath -> AbsolutePath -> Bool
+isAncestorOf (AbsolutePath parentPath) (AbsolutePath childPath) =
+  let parentDirs = FilePath.splitDirectories parentPath
+      childDirs = FilePath.splitDirectories childPath
+      zipped = zip parentDirs childDirs
+      commonDirs = takeWhile (\(parentDir, childDir) -> parentDir == childDir) zipped
+   in length parentDirs == length commonDirs
