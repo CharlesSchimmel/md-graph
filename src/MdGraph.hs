@@ -53,12 +53,8 @@ import MdGraph.App.Command (Command)
 import MdGraph.App.Logger
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config
-import MdGraph.File (AbsolutePath (..), Files (..), RelativePath (..), unrelativize)
-import MdGraph.File.Internal
-  ( AbsolutePath (..),
-    File (..),
-    RelativePath (..),
-  )
+import MdGraph.File (Files (..), unrelativize)
+import MdGraph.File.Types (AbsolutePath (..), File (..), RelativePath (..))
 import MdGraph.Node (Link (..))
 import MdGraph.Node as Node
 import MdGraph.Parse

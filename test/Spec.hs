@@ -25,7 +25,7 @@ import qualified MdGraph.App.LogLevel as LogLevel
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config (Config (Config, libraryPath))
 import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
-import MdGraph.File.Internal (AbsolutePath (..), File)
+import MdGraph.File.Types (AbsolutePath (..), File(..))
 import MdGraph.Node (Link (..))
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base

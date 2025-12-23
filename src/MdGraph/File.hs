@@ -3,8 +3,6 @@
 {-# HLINT ignore "Use uncurry" #-}
 module MdGraph.File
   ( Files (..),
-    AbsolutePath (..),
-    Internal.RelativePath (..),
     normaliseEvil,
     unrelativize,
     isAncestorOf,
@@ -17,8 +15,8 @@ import MdGraph.Config
   ( Config (..),
     HasConfig (getConfig),
   )
-import MdGraph.File.Internal (AbsolutePath (..), File (..), RelativePath (..))
 import qualified MdGraph.File.Internal as Internal
+import MdGraph.File.Types
 import System.FilePath
 import qualified System.FilePath as FilePath
 
@@ -49,7 +47,7 @@ type RebasedFilePath = FilePath
 -- -- "/foo/bar/qux.md"
 -- TODO: Enforce source and dest as absolute _files_ (not dirs?)?
 -- TODO: Detilde before reaching this function
-unrelativize :: AbsolutePath -> Internal.DestFilePath -> AbsolutePath
+unrelativize :: AbsolutePath -> DestFilePath -> AbsolutePath
 unrelativize (AbsolutePath source) dest
   | FilePath.isAbsolute dest = AbsolutePath dest
   | otherwise = normaliseEvil $ AbsolutePath unnormalisedDestDir

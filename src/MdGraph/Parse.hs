@@ -33,8 +33,8 @@ import MdGraph.Config
       ),
     HasConfig (getConfig),
   )
-import MdGraph.File.Internal
-  ( AbsolutePath (AbsolutePath),
+import MdGraph.File.Types
+  ( AbsolutePath (..),
   )
 import MdGraph.Node
 import MdGraph.Parse.Pandoc
