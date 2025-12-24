@@ -59,7 +59,7 @@ parseCommand =
   hsubparser
     ( command
         "subgraph"
-        ( info (Subgraph <$> (parseSubgraphOptions <*> parseMaxDepth (-1))) $
+        ( info (Subgraph <$> (parseSubgraphOptions <*> parseMaxDepth (-1) <*> parseMinDepth)) $
             progDesc "The subgraph of a node"
         )
         <> command

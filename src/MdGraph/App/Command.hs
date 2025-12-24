@@ -1,44 +1,44 @@
 {-# LANGUAGE StrictData #-}
+
 module MdGraph.App.Command where
 
-import           Aux.HashSet
-import           MdGraph.TagDirection
+import Aux.HashSet
+import Data.HashSet as S
+import Data.List.NonEmpty
+import MdGraph.TagDirection
 
-import           Data.HashSet                  as S
-import           Data.List.NonEmpty
-
-data Command =
-    -- | Just populate the db, don't return anything
+data Command
+  = -- | Just populate the db, don't return anything
     Populate
-    -- | Find documents that don't have any forward or backward ldinks
-      | Orphans
-    -- | Find documents that don't have any backward links
-      | Unreachable
-    -- | Find links that don't resolve to actual documents
-      | Nonexes
-    -- | Find links that resolve to non-documents
-      | Statics
-    -- | Find the links of a document and its links' links, etc
-      | Subgraph SubgraphOptions
-    -- | Find the files that link to a document
-      | Backlinks BacklinkOptions
-      deriving Show
+  | -- | Find documents that don't have any forward or backward ldinks
+    Orphans
+  | -- | Find documents that don't have any backward links
+    Unreachable
+  | -- | Find links that don't resolve to actual documents
+    Nonexes
+  | -- | Find links that resolve to non-documents
+    Statics
+  | -- | Find the links of a document and its links' links, etc
+    Subgraph SubgraphOptions
+  | -- | Find the files that link to a document
+    Backlinks BacklinkOptions
+  deriving (Show)
 
 data SubgraphTarget = FileTarget FilePath | TagTarget FilePath
-    deriving Show
+  deriving (Show)
 
 data SubgraphOptions = SubgraphOptions
-  { sgTargets    :: [SubgraphTarget] -- TODO: Subgraph of a tag does not really make sense, tags can only be linked to
-  , sgInclNonex  :: Bool
-  , sgInclStatic :: Bool
-  , sgTagDir     :: TagDirection
-  , sgMaxDepth      :: Integer
+  { sgTargets :: [SubgraphTarget], -- TODO: Subgraph of a tag does not really make sense, tags can only be linked to
+    sgInclNonex :: Bool,
+    sgInclStatic :: Bool,
+    sgTagDir :: TagDirection,
+    sgMaxDepth :: Integer,
+    sgMinDepth :: Integer
   }
-  deriving Show
-
+  deriving (Show)
 
 data BacklinkOptions = BacklinkOptions
-  { blTargets :: [SubgraphTarget]
-  , blDepth   :: Integer
+  { blTargets :: [SubgraphTarget],
+    blDepth :: Integer
   }
-  deriving Show
+  deriving (Show)

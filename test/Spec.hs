@@ -58,6 +58,7 @@ main = do
   libraryDir <- getLibraryDir
   hspec FilesSpec.spec
   hspec $ do
+    let baseSgOptions = SubgraphOptions { sgInclNonex = False, sgInclStatic = False, sgTagDir = TagDirection.In, sgMaxDepth = -1, sgTargets = [], sgMinDepth = -1 }
     describe "Backlinks" $ do
       it "Correct backlinks are returned" $ do
         let command = Backlinks (BacklinkOptions [FileTarget $ libraryDir </> Constants.linkChain4_md] 2)
@@ -67,27 +68,13 @@ main = do
     describe "Subgraph" $ do
       it "Return the full subgraph of a file" $ do
         let command =
-              Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md],
-                    sgInclNonex = False,
-                    sgInclStatic = False,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1
-                  }
+              Subgraph $ baseSgOptions { sgTargets =  [FileTarget $ libraryDir </> Constants.linkChain1_md]}
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md, Constants.linkChain4_md]
 
       it "Max depth is respected" $ do
         let command =
-              Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md],
-                    sgInclNonex = False,
-                    sgInclStatic = False,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = 3
-                  }
+              Subgraph $ baseSgOptions { sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md], sgMaxDepth = 3}
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md]
         mdGraph args >>= outputDoesNotContain [Constants.linkChain4_md]
@@ -95,25 +82,16 @@ main = do
       it "Nonexistent (broken) links are included if requested" $ do
         let command =
               Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasNonExistentLink_md],
-                    sgInclNonex = True,
-                    sgInclStatic = False,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1
-                  }
+                baseSgOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasNonExistentLink_md], sgInclNonex = True }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains ["link-to-nonexistent-file.md"]
 
       it "Nonexistent (broken) links are _not_ included if not requested" $ do
         let command =
               Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasNonExistentLink_md],
-                    sgInclNonex = False,
-                    sgInclStatic = False,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1
+                baseSgOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasNonExistentLink_md]
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputDoesNotContain ["link-to-nonexistent-file.md"]
@@ -121,12 +99,9 @@ main = do
       it "Static files (ie files not recognized as documents) are included if requested" $ do
         let command =
               Subgraph $
-                SubgraphOptions
+                baseSgOptions
                   { sgTargets = [FileTarget $ libraryDir </> Constants.hasStaticFileLink_md],
-                    sgInclNonex = False,
-                    sgInclStatic = True,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1
+                    sgInclStatic = True
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.static_txt]
@@ -134,12 +109,8 @@ main = do
       it "Static files (ie files not recognized as documents) are _not_ included if not requested" $ do
         let command =
               Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasStaticFileLink_md],
-                    sgInclNonex = False,
-                    sgInclStatic = False,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1
+                baseSgOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasStaticFileLink_md]
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputDoesNotContain [Constants.static_txt]
@@ -148,11 +119,8 @@ main = do
       it "Absolute paths are accepted and relativized to the library" $ do
         let command =
               Subgraph $
-                SubgraphOptions
+                baseSgOptions
                   { sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md],
-                    sgInclNonex = True,
-                    sgInclStatic = True,
-                    sgTagDir = TagDirection.In,
                     sgMaxDepth = 1
                   }
         let args = defaultSpecArgs {argCommand = command}
@@ -161,12 +129,8 @@ main = do
       it "Paths relative to the current directory are accepted and relativized to the library" $ do
         let command =
               Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ "./test/library" </> Constants.linkChain1_md],
-                    sgInclNonex = True,
-                    sgInclStatic = True,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = 1
+                baseSgOptions
+                  { sgTargets = [FileTarget $ "./test/library" </> Constants.linkChain1_md]
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.linkChain1_md]
@@ -174,12 +138,8 @@ main = do
       it "Relative directory traversals are resolved and simplified" $ do
         let command =
               Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.usesDirectoryTraversal_md],
-                    sgInclNonex = True,
-                    sgInclStatic = True,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1
+                baseSgOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.usesDirectoryTraversal_md]
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
@@ -187,12 +147,8 @@ main = do
       it "Convoluted directory traversals are resolved and simplified" $ do
         let command =
               Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.usesConvolutedDirectoryTraversal_md],
-                    sgInclNonex = True,
-                    sgInclStatic = True,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1
+                baseSgOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.usesConvolutedDirectoryTraversal_md]
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
@@ -225,7 +181,8 @@ main = do
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1
+                    sgMaxDepth = -1,
+                    sgMinDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
@@ -238,7 +195,8 @@ main = do
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1
+                    sgMaxDepth = -1,
+                    sgMinDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
