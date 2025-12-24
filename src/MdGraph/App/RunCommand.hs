@@ -102,11 +102,11 @@ runSubgraph ::
   (Monad m, Queries m, Logs m, Files m, HasConfig m) =>
   SubgraphOptions ->
   m [FilePath]
-runSubgraph options@SubgraphOptions {sgTargets, sgDepth, sgInclNonex, sgInclStatic} = do
+runSubgraph options@SubgraphOptions {sgTargets, sgMaxDepth, sgInclNonex, sgInclStatic} = do
   logInfo . T.unwords $ ["Finding subgraphs"]
   pathsSet <-
     F.foldrM
-      (flip $ runSubgraphOnArg linkGetter sgDepth)
+      (flip $ runSubgraphOnArg linkGetter sgMaxDepth)
       S.empty
       sgTargets
   let paths = S.toList pathsSet

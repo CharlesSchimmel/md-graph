@@ -25,7 +25,7 @@ import qualified MdGraph.App.LogLevel as LogLevel
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config (Config (Config, libraryPath))
 import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
-import MdGraph.File.Types (AbsolutePath (..), File(..))
+import MdGraph.File.Types (AbsolutePath (..), File (..))
 import MdGraph.Node (Link (..))
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base
@@ -73,10 +73,24 @@ main = do
                     sgInclNonex = False,
                     sgInclStatic = False,
                     sgTagDir = TagDirection.In,
-                    sgDepth = -1
+                    sgMaxDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md, Constants.linkChain4_md]
+
+      it "Max depth is respected" $ do
+        let command =
+              Subgraph $
+                SubgraphOptions
+                  { sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md],
+                    sgInclNonex = False,
+                    sgInclStatic = False,
+                    sgTagDir = TagDirection.In,
+                    sgMaxDepth = 3
+                  }
+        let args = defaultSpecArgs {argCommand = command}
+        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md]
+        mdGraph args >>= outputDoesNotContain [Constants.linkChain4_md]
 
       it "Nonexistent (broken) links are included if requested" $ do
         let command =
@@ -86,7 +100,7 @@ main = do
                     sgInclNonex = True,
                     sgInclStatic = False,
                     sgTagDir = TagDirection.In,
-                    sgDepth = -1
+                    sgMaxDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains ["link-to-nonexistent-file.md"]
@@ -99,7 +113,7 @@ main = do
                     sgInclNonex = False,
                     sgInclStatic = False,
                     sgTagDir = TagDirection.In,
-                    sgDepth = -1
+                    sgMaxDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputDoesNotContain ["link-to-nonexistent-file.md"]
@@ -112,7 +126,7 @@ main = do
                     sgInclNonex = False,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
-                    sgDepth = -1
+                    sgMaxDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.static_txt]
@@ -125,7 +139,7 @@ main = do
                     sgInclNonex = False,
                     sgInclStatic = False,
                     sgTagDir = TagDirection.In,
-                    sgDepth = -1
+                    sgMaxDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputDoesNotContain [Constants.static_txt]
@@ -139,7 +153,7 @@ main = do
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
-                    sgDepth = 1
+                    sgMaxDepth = 1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.linkChain1_md]
@@ -152,7 +166,7 @@ main = do
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
-                    sgDepth = 1
+                    sgMaxDepth = 1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.linkChain1_md]
@@ -165,7 +179,7 @@ main = do
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
-                    sgDepth = -1
+                    sgMaxDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
@@ -178,7 +192,7 @@ main = do
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
-                    sgDepth = -1
+                    sgMaxDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
@@ -211,7 +225,7 @@ main = do
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
-                    sgDepth = -1
+                    sgMaxDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
@@ -224,7 +238,7 @@ main = do
                     sgInclNonex = True,
                     sgInclStatic = True,
                     sgTagDir = TagDirection.In,
-                    sgDepth = -1
+                    sgMaxDepth = -1
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]

@@ -32,7 +32,7 @@ data SubgraphOptions = SubgraphOptions
   , sgInclNonex  :: Bool
   , sgInclStatic :: Bool
   , sgTagDir     :: TagDirection
-  , sgDepth      :: Integer
+  , sgMaxDepth      :: Integer
   }
   deriving Show
 
