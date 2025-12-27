@@ -201,11 +201,11 @@ runSubgraphPath' linkGetter maxDepth currentDepth foundPaths newPath = do
         childPaths
 
 runBacklinks :: BacklinkOptions -> App [FilePath]
-runBacklinks options@BacklinkOptions {blTargets, blDepth} = do
+runBacklinks options@BacklinkOptions {blTargets, blMaxDepth} = do
   logInfo . T.unwords $ ["Finding backlinks"]
   paths <-
     F.foldrM
-      (flip $ runSubgraphOnArg linkGetter blDepth)
+      (flip $ runSubgraphOnArg linkGetter blMaxDepth)
       S.empty
       blTargets
   return . List.map sgResultPath . S.toList $ paths

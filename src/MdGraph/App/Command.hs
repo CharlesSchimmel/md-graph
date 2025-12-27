@@ -39,6 +39,6 @@ data SubgraphOptions = SubgraphOptions
 
 data BacklinkOptions = BacklinkOptions
   { blTargets :: [SubgraphTarget],
-    blDepth :: Integer
+    blMaxDepth :: Integer
   }
   deriving (Show)
