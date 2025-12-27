@@ -59,12 +59,12 @@ parseCommand =
   hsubparser
     ( command
         "subgraph"
-        ( info (Subgraph <$> (parseSubgraphOptions <*> parseDepth (-1))) $
+        ( info (Subgraph <$> parseSubgraphOptions) $
             progDesc "The subgraph of a node"
         )
         <> command
           "backlinks"
-          ( info (Backlinks <$> (parseBacklinkOptions <*> parseDepth 2)) $
+          ( info (Backlinks <$> parseBacklinkOptions) $
               progDesc "The backlinks (reverse subgraph) of a node"
           )
         <> command
@@ -128,16 +128,30 @@ parseSubgraphOptions =
     <*> parseIncludeNonExistent
     <*> parseIncludeStatic
     <*> parseTagDirection
+    <*> parseMaxDepth subgraphDefaultMaxDepth
+    <*> parseMinDepth subgraphDefaultMinDepth
 
-parseBacklinkOptions = BacklinkOptions <$> parseSubgraphTargets
+parseBacklinkOptions =
+  BacklinkOptions
+    <$> parseSubgraphTargets
+    <*> parseMaxDepth backlinksDefaultMaxDepth
+    <*> parseMinDepth backlinksDefaultMinDepth
 
-parseDepth :: Integer -> Parser Integer
-parseDepth def =
+parseMaxDepth :: Integer -> Parser Integer
+parseMaxDepth def =
   option auto $
-    long "depth"
-      <> help "How deep traversal should go"
+    long "max-depth"
+      <> help "How many links deep traversal should go"
       <> showDefault
       <> value def
+
+parseMinDepth :: Integer -> Parser Integer
+parseMinDepth _default =
+  option auto $
+    long "min-depth"
+      <> help "Only return links that are this many deep. The target node is at depth 0."
+      <> showDefault
+      <> value _default
 
 parseSubgraphTargets :: Parser [SubgraphTarget]
 parseSubgraphTargets =
