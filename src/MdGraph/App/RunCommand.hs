@@ -102,11 +102,11 @@ runSubgraph ::
   (Monad m, Queries m, Logs m, Files m, HasConfig m) =>
   SubgraphOptions ->
   m [FilePath]
-runSubgraph options@SubgraphOptions {sgTargets, sgMaxDepth, sgInclNonex, sgInclStatic} = do
+runSubgraph options@SubgraphOptions {sgTargets, sgMinDepth, sgMaxDepth, sgInclNonex, sgInclStatic} = do
   logInfo . T.unwords $ ["Finding subgraphs"]
   pathsSet <-
     F.foldrM
-      (flip $ runSubgraphOnArg linkGetter sgMaxDepth)
+      (flip $ runSubgraphOnArg linkGetter sgMinDepth sgMaxDepth)
       S.empty
       sgTargets
   let paths = S.toList pathsSet
@@ -156,26 +156,31 @@ runSubgraph options@SubgraphOptions {sgTargets, sgMaxDepth, sgInclNonex, sgInclS
 -- | Gets the children of the provided path
 type LinkGetter m = FilePath -> m [SgResult]
 
+data Depth = Depth {max :: Integer, min :: Integer, current :: Integer}
+
 runSubgraphOnArg ::
   (Monad m, HasConfig m, Files m) =>
   LinkGetter m ->
   Integer ->
+  Integer ->
   HashSet SgResult -> -- foundPaths
   SubgraphTarget ->
   m (HashSet SgResult)
-runSubgraphOnArg linkGetter maxDepth foundPaths (FileTarget path) = do
+runSubgraphOnArg linkGetter minDepth maxDepth foundPaths (FileTarget path) = do
   libPath <- libraryPath <$> getConfig
   targetAbsolutePath <- trueAbsolutePath path
   -- Making this an SgDocument feels a little dirty because that implies we know it exists...
   let relPath = SgDocument $ makeRelative libPath targetAbsolutePath
 
   -- TODO: fix infinite depth to be a real value instead of this hack
-  runSubgraphPath' linkGetter maxDepth 0 foundPaths relPath
-runSubgraphOnArg _ _ _ _ = pure S.empty -- TODO: support tag subgraphs
+  runSubgraphPath' linkGetter minDepth maxDepth 0 foundPaths relPath
+runSubgraphOnArg _ _ _ _ _ = pure S.empty -- TODO: support tag subgraphs
 
 runSubgraphPath' ::
   (Monad m) =>
   LinkGetter m ->
+  -- | MinDepth
+  Integer ->
   -- | MaxDepth
   Integer ->
   -- | Current depth
@@ -185,27 +190,27 @@ runSubgraphPath' ::
   -- | The target file to find the subgraph of
   SgResult ->
   m (S.HashSet SgResult)
-runSubgraphPath' linkGetter maxDepth currentDepth foundPaths newPath = do
+runSubgraphPath' linkGetter minDepth maxDepth currentDepth foundPaths newPath = do
   let alreadyExists = S.member newPath foundPaths
       pastMaxDepth = currentDepth == maxDepth
   if alreadyExists || pastMaxDepth
     then return foundPaths
     else do
-      let setWithCurrent = S.insert newPath foundPaths
+      let setWithCurrent = if currentDepth >= minDepth then S.insert newPath foundPaths else S.empty
 
       childPaths <- linkGetter $ sgResultPath newPath
 
       F.foldrM
-        (flip $ runSubgraphPath' linkGetter maxDepth (currentDepth + 1))
+        (flip $ runSubgraphPath' linkGetter minDepth maxDepth (currentDepth + 1))
         setWithCurrent
         childPaths
 
 runBacklinks :: BacklinkOptions -> App [FilePath]
-runBacklinks options@BacklinkOptions {blTargets, blMaxDepth} = do
+runBacklinks options@BacklinkOptions {blTargets, blMaxDepth, blMinDepth} = do
   logInfo . T.unwords $ ["Finding backlinks"]
   paths <-
     F.foldrM
-      (flip $ runSubgraphOnArg linkGetter blMaxDepth)
+      (flip $ runSubgraphOnArg linkGetter blMinDepth blMaxDepth)
       S.empty
       blTargets
   return . List.map sgResultPath . S.toList $ paths

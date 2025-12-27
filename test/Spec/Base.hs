@@ -1,9 +1,12 @@
 module Spec.Base where
 
+import qualified Aux.Functor
 import qualified Constants
 import Control.Exception (evaluate)
 import qualified Control.Exception as E
 import Control.Monad (unless)
+import qualified Control.Monad as Monad
+import qualified Control.Monad as Traversable
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Data.Either (fromRight, isRight)
@@ -55,8 +58,8 @@ outputContains expected eitherList = do
   fromRight (shouldSatisfy eitherList isRight) liftedExpectation
 
 outputDoesNotContain :: (HasCallStack, Show a, Show r, Eq r, Ord r) => [r] -> Either a [r] -> Expectation
-outputDoesNotContain expected eitherList = do
-  let orderedExpected = List.sort expected
-  let orderedEither = List.sort <$> eitherList
-  let liftedExpectation = (`shouldNotContain` orderedExpected) <$> orderedEither
-  fromRight (shouldSatisfy eitherList isRight) liftedExpectation
+outputDoesNotContain rejectedValues eitherList = do
+  let failIfLeft _ = eitherList `shouldSatisfy` isRight
+  either failIfLeft shouldNotContainAnyRejectedValues eitherList
+  where
+    shouldNotContainAnyRejectedValues actualValues = Monad.forM_ rejectedValues $ \value -> actualValues `shouldNotContain` [value]

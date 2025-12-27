@@ -37,8 +37,19 @@ data SubgraphOptions = SubgraphOptions
   }
   deriving (Show)
 
+subgraphDefaultMaxDepth = -1
+
+-- By default, include the target file.
+subgraphDefaultMinDepth = 0
+
+backlinksDefaultMaxDepth = 2
+
+-- By default, do not include the target file.
+backlinksDefaultMinDepth = 1
+
 data BacklinkOptions = BacklinkOptions
   { blTargets :: [SubgraphTarget],
-    blMaxDepth :: Integer
+    blMaxDepth :: Integer,
+    blMinDepth :: Integer
   }
   deriving (Show)
