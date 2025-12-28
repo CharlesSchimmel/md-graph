@@ -148,7 +148,7 @@ prepareDatabase = do
 
   let filesAndDocumentToParse = M.elems $ M.unionZip relativeFileMap docKeyMap
 
-  (newEdges, newTags) <- doParseDocuments filesAndDocumentToParse
+  (newEdges, newTags) <- parseDocumentsAndOrganizeResults filesAndDocumentToParse
 
   logInfo
     . T.unwords
@@ -170,11 +170,11 @@ reportDocumentCount num reason = do
   logInfo . T.unwords $ [T.pack . show $ num, reason]
   pure ()
 
-doParseDocuments ::
+parseDocumentsAndOrganizeResults ::
   (Monad m, HasConfig m, Logs m, Files m, Parses m) =>
   [(File, Key Document)] ->
   m ([Edge], [Schema.Tag])
-doParseDocuments filesAndDocumentToParse = do
+parseDocumentsAndOrganizeResults filesAndDocumentToParse = do
   parseErrorOrContext <- Monad.forM filesAndDocumentToParse $ \(file, document) -> do
     parseErrorOrResult <- parseDocument . absolutePath $ file
     return $ do
