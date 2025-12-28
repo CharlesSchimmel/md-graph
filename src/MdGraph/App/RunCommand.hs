@@ -23,6 +23,7 @@ import qualified Data.List as L
 import qualified Data.List as List
 import Data.Maybe (catMaybes)
 import qualified Data.Text as T
+import qualified Data.Traversable as Traversable
 import Database.Persist (Entity (entityVal))
 import GHC.Generics (Generic)
 import GHC.IO.Encoding (getForeignEncoding)
@@ -44,9 +45,9 @@ import MdGraph.File
   ( Files (findDocuments, maybeFile),
     trueAbsolutePath,
   )
-import MdGraph.File.Types (AbsolutePath (..), File (..))
-import MdGraph.Persist.Class (Queries (..))
-import MdGraph.Persist.Query as Q
+import MdGraph.File.Types (AbsolutePath (..), File (..), RelativePath (..))
+import MdGraph.Persist.Class (PreparesDb (..), Queries (..))
+import qualified MdGraph.Persist.Mapper as Mapper
 import MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema as Edge
   ( Edge (..),
@@ -65,14 +66,23 @@ runCommand (Backlinks options) = runBacklinks options
 runCommand Statics = throwError "NYI"
 runCommand (Populate _) = pure mempty
 
-runPopulate :: (Monad m, Queries m, Logs m, Files m, HasConfig m) => PopulateOptions -> m [String]
+runPopulate :: (Monad m, PreparesDb m, Queries m, Logs m, Files m, HasConfig m) => PopulateOptions -> m [String]
 runPopulate PopulateAll = pure mempty
 runPopulate (PopulateTargets targets) = do
   absoluteTargetPaths <- Monad.mapM trueAbsolutePath targets
 
   Config {defaultExtension} <- getConfig
-  documents <- findDocuments absoluteTargetPaths
-  let targetPaths = Aux.Functor.for documents $ \File {relativePath} -> relativePath
+  foundDocuments <- findDocuments absoluteTargetPaths
+  -- let unFoundDocuments = Get the documents that weren't found and delete them, if possible
+
+  logDebug "Populating TempDocuments"
+  _ <- insertTempDocuments $ Mapper.fromFile <$> foundDocuments
+
+  let targetPaths = Aux.Functor.for foundDocuments $ \File {relativePath} -> unRelativePath relativePath
+  deletedDocumentCount <- deleteDocuments targetPaths
+
+  logDebug "Pruning unchanged TempDocuments"
+  unchangedCt <- pruneUnchangedTempDocuments
 
   return []
 

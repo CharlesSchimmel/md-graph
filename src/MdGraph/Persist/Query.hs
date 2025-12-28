@@ -18,6 +18,7 @@ module MdGraph.Persist.Query
     nonexistent,
     forwardLinks,
     backwardLinks,
+    deleteDocuments,
   )
 where
 

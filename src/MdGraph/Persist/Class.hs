@@ -43,6 +43,7 @@ class PreparesDb m where
   pruneUnchangedTempDocuments :: m Int64
   pruneDeletedDocuments :: m Int64
   pruneModifiedDocuments :: m Int64
+  deleteDocuments :: [FilePath] -> m Int64
 
 instance PreparesDb App where
   migrate = runQuery migrateMdGraph
@@ -54,6 +55,7 @@ instance PreparesDb App where
   pruneUnchangedTempDocuments = runQuery Q.pruneUnchangedTempDocs
   pruneDeletedDocuments = runQuery Q.pruneDeletedDocuments
   pruneModifiedDocuments = runQuery Q.pruneModifiedDocs
+  deleteDocuments = runQuery . Q.deleteDocuments
 
 class Queries m where
   getOrphans :: m [Entity Document]
