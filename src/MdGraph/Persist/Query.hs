@@ -128,7 +128,7 @@ pruneUnchangedTempDocs = deleteCount $ do
         )
 
 -- | Must be called before pruneUnchangedTempDocs!
--- Delete Docmuments not found in most recent scan This should cascade to a
+-- Delete Docmuments not found TempDocuments. This should cascade to a
 -- document's Tags and Edges
 pruneDeletedDocuments :: Query Int64
 pruneDeletedDocuments = deleteCount $ do
@@ -145,6 +145,11 @@ whereDocumentDeleted file = do
             tf <- from $ table @TempDocument
             pure $ tf ^. TempDocumentPath
         )
+
+deleteDocuments :: DocumentPath -> Query Int64
+deleteDocuments path = deleteCount $ do
+  where_ $
+    file ^. DocumentPath
 
 -- | Delete modified Documents (modified determined when the TempDoc
 -- counterpart has a newer Modified) so that they can be found when newDocs is

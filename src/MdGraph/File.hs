@@ -27,15 +27,21 @@ class Files m where
   -- | Check if a FilePath exists; Nothing if it doesn't, Just FilePath if it does.
   maybeFile :: FilePath -> m (Maybe FilePath)
 
+  -- | Find some documents
+  findDocuments :: [FilePath] -> m [File]
+
   -- | Find all documents
-  findDocuments :: m [File]
+  findAllDocuments :: m [File]
 
 instance Files App where
   trueAbsolutePath = liftIO . Internal.trueAbsolutePathIO
   maybeFile = liftIO . Internal.maybeFile
 
-  -- Never used
-  findDocuments = do
+  findDocuments paths = do
+    Config {defaultExtension} <- getConfig
+    liftIO $ Internal.findDocuments defaultExtension paths
+
+  findAllDocuments = do
     config@Config {..} <- getConfig
     liftIO $ Internal.findDocuments defaultExtension [libraryPath]
 

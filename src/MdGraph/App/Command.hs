@@ -6,10 +6,11 @@ import Aux.HashSet
 import Data.HashSet as S
 import Data.List.NonEmpty
 import MdGraph.TagDirection
+import MdGraph.File.Types
 
 data Command
   = -- | Just populate the db, don't return anything
-    Populate
+    Populate PopulateOptions
   | -- | Find documents that don't have any forward or backward ldinks
     Orphans
   | -- | Find documents that don't have any backward links
@@ -23,6 +24,9 @@ data Command
   | -- | Find the files that link to a document
     Backlinks BacklinkOptions
   deriving (Show)
+
+data PopulateOptions = PopulateAll | PopulateTargets { popTargets :: [FilePath] }
+  deriving Show
 
 data SubgraphTarget = FileTarget FilePath | TagTarget FilePath
   deriving (Show)

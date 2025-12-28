@@ -83,8 +83,22 @@ parseCommand =
           )
         <> command
           "populate"
-          (info (pure Populate) $ progDesc "Just populate the database")
+          (info (Populate <$> parsePopulateOptions) $ progDesc "Just populate the database")
     )
+
+parsePopulateOptions :: Parser PopulateOptions
+parsePopulateOptions =
+  let allFilesSwitch =
+        flag'
+          PopulateAll
+          ( long "all"
+              <> short 'a'
+              <> help "Scan and populate all files in the library"
+          )
+      fileTargets =
+        PopulateTargets
+          <$> some (strOption (long "file" <> short 'f' <> help "Parse and populate specific file(s)." <> metavar "FILE"))
+   in allFilesSwitch <|> fileTargets
 
 parseDatabase :: Parser DatabaseArg
 parseDatabase =

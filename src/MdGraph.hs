@@ -110,7 +110,7 @@ prepareDatabase = do
 
   -- find documents
   logDebug "Finding documents"
-  foundDocuments <- findDocuments
+  foundDocuments <- findAllDocuments
   let totalCt = P.length foundDocuments
   let relativeFileMap = M.fromList' relativePath foundDocuments
 

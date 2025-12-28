@@ -40,7 +40,7 @@ import MdGraph.Config
     HasConfig (getConfig),
   )
 import MdGraph.File
-  ( Files (maybeFile),
+  ( Files (findDocuments, maybeFile),
     trueAbsolutePath,
   )
 import MdGraph.Persist.Class (Queries (..))
@@ -61,7 +61,14 @@ runCommand Nonexes = fmap edgeHead <$> runNonexistent
 runCommand (Subgraph options) = runSubgraph options
 runCommand (Backlinks options) = runBacklinks options
 runCommand Statics = throwError "NYI"
-runCommand Populate = pure mempty
+runCommand (Populate _) = pure mempty
+
+runPopulate :: (Monad m, Queries m, Logs m, Files m, HasConfig m) => PopulateOptions -> m [String]
+runPopulate PopulateAll = pure mempty
+runPopulate (PopulateTargets targets) = do
+  Config {defaultExtension} <- getConfig
+  documents <- findDocuments targets
+  return []
 
 runOrphans :: (Monad m, Queries m, Logs m) => m [Document]
 runOrphans = do
