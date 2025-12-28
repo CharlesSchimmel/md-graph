@@ -44,7 +44,7 @@ defaultSpecArgs =
       argDefExt = "md",
       argDatabase = Arguments.DbFile ":memory:",
       argLogLevel = LogLevel.None,
-      argCommand = Command.Populate
+      argCommand = Command.Populate Command.PopulateAll
     }
 
 shouldReturnFrom :: (HasCallStack, Show a, Eq a) => a -> IO a -> Expectation

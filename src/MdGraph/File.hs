@@ -22,13 +22,13 @@ import qualified System.FilePath as FilePath
 
 class Files m where
   -- | Detilde and ensure the given path is absolute. Does not check for file existence.
-  trueAbsolutePath :: FilePath -> m FilePath
+  trueAbsolutePath :: FilePath -> m AbsolutePath
 
   -- | Check if a FilePath exists; Nothing if it doesn't, Just FilePath if it does.
   maybeFile :: FilePath -> m (Maybe FilePath)
 
   -- | Find some documents
-  findDocuments :: [FilePath] -> m [File]
+  findDocuments :: [AbsolutePath] -> m [File]
 
   -- | Find all documents
   findAllDocuments :: m [File]

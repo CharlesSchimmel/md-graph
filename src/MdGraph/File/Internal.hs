@@ -49,9 +49,11 @@ maybeDirectory dir = maybeTester D.doesDirectoryExist dir
 -- | Find documents in library and return them with FilePaths relative to the
 -- library
 findDocuments ::
-  (Traversable f, Foldable f) => DefaultExtension -> f FilePath -> IO [File]
+  DefaultExtension -> [AbsolutePath] -> IO [File]
 findDocuments defaultExt sourcePaths = do
-  Monad.join . catMaybes . toList <$> T.mapM (traverseDir defaultExt) sourcePaths
+  maybeFiles <- T.mapM (traverseDir defaultExt . unAbsolutePath) sourcePaths
+  let unmaybedFiles = catMaybes maybeFiles
+  return $ Monad.join unmaybedFiles
 
 data PathType = F FilePath | D FilePath deriving (Show)
 
@@ -92,8 +94,11 @@ expand extension (D path) = do
 -- or we could run into filepath collisions.
 
 -- | canonicalize path and also convert tilde home directory reference to actual
-trueAbsolutePathIO :: FilePath -> IO FilePath
-trueAbsolutePathIO path = detilde path >>= makeAbsolute
+trueAbsolutePathIO :: FilePath -> IO AbsolutePath
+trueAbsolutePathIO path = do
+  detilded <- detilde path
+  absolute <- makeAbsolute detilded
+  return $ AbsolutePath absolute
 
 -- TODO: shouldn't the shell expand this before passing it in?
 detilde :: FilePath -> IO FilePath

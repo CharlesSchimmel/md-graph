@@ -104,7 +104,7 @@ prepareDatabase ::
   (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m) => m ()
 prepareDatabase = do
   Config {defaultExtension, libraryPath, dbConnString} <- getConfig
-  logDebug $ T.unwords ["Using library:", T.pack libraryPath]
+  logDebug $ T.unwords ["Using library:", T.pack $ unAbsolutePath libraryPath]
   logDebug $ T.unwords ["Preparing database:", dbConnString]
   migrate
 
@@ -255,7 +255,7 @@ checkPathExists knownPaths path = do
 
 mkLinksRelativeToLibrary :: (Monad m, HasConfig m) => AbsoluteLink -> m RelativeLink
 mkLinksRelativeToLibrary (AbsoluteLink link@Link {linkPath, linkText}) = do
-  Config {libraryPath} <- getConfig
+  Config {libraryPath = AbsolutePath {unAbsolutePath = libraryPath}} <- getConfig
   return . RelativeLink $
     Link
       { linkText = linkText,

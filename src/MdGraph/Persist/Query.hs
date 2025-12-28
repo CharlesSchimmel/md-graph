@@ -146,10 +146,14 @@ whereDocumentDeleted file = do
             pure $ tf ^. TempDocumentPath
         )
 
-deleteDocuments :: DocumentPath -> Query Int64
-deleteDocuments path = deleteCount $ do
+deleteDocuments ::
+  -- | Path relative to the library
+  [FilePath] ->
+  Query Int64
+deleteDocuments paths = deleteCount $ do
+  file <- from $ table @Document
   where_ $
-    file ^. DocumentPath
+    file ^. DocumentPath `in_` valList paths
 
 -- | Delete modified Documents (modified determined when the TempDoc
 -- counterpart has a newer Modified) so that they can be found when newDocs is
