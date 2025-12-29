@@ -149,7 +149,7 @@ parseMinDepth :: Integer -> Parser Integer
 parseMinDepth _default =
   option auto $
     long "min-depth"
-      <> help "Only return links that are this many deep. The target node is at depth 0."
+      <> help "Only return links that are this many deep. 0-indexed: depth 0 includes the starting node in the output."
       <> showDefault
       <> value _default
 
