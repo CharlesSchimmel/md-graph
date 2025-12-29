@@ -1,17 +1,5 @@
 cradle:
   stack:
-    # - path: "./test"
-    #   component: "md-graph-test"
-    # - path: "./src"
-    #   component: "md-graph"
-    # - path: "./app"
-    #   component: "md-graph"
-    # - path: "./test"
-    #   component: "md-graph:md-graph-test"
-    # - path: "./src"
-    #   component: "md-graph:md-graph"
-    # - path: "./app"
-    #   component: "md-graph:md-graph"
     - path: "./src"
       component: "md-graph:exe:md-graph"
 
@@ -23,4 +11,3 @@ cradle:
 
     - path: "./test/Spec.hs"
       component: "md-graph:test:md-graph-test"
-      # component: "md-graph:exe:md-graph"
