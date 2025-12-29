@@ -4,6 +4,7 @@ module MdGraph.Config where
 import           Aux.Common                     ( explain )
 import           Control.Monad.Except
 import           Control.Monad.Logger           ( logDebug )
+import           Control.Monad.IO.Class         ( MonadIO(liftIO) )
 import qualified Data.Text                     as T
                                                 ( Text(..)
                                                 , pack

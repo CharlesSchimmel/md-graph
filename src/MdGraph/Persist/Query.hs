@@ -1,61 +1,63 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-#  LANGUAGE TypeApplications  #-}
-{-#  LANGUAGE RankNTypes  #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module MdGraph.Persist.Query
-    ( insertEdges
-    , insertTags
-    , insertDocuments
-    , insertTempDocuments
-    , pruneDeletedDocuments
-    , pruneUnchangedTempDocs
-    , newFiles
-    , unreachableM
-    , orphansM
-    , pruneModifiedDocs
-    , nonexistant
-    , forwardLinks
-    , backwardLinks
-    ) where
+  ( insertEdges,
+    insertTags,
+    insertDocuments,
+    insertTempDocuments,
+    pruneDeletedDocuments,
+    pruneUnchangedTempDocs,
+    newFiles,
+    unreachableM,
+    orphansM,
+    pruneModifiedDocs,
+    nonexistent,
+    forwardLinks,
+    backwardLinks,
+  )
+where
 
-import           MdGraph.Persist.Schema
-
-import           Aux.Common                     ( batch )
-import           Control.Monad                  ( mapM )
-import           Control.Monad.Logger           ( NoLoggingT(..) )
-import           Control.Monad.Reader           ( MonadIO(liftIO)
-                                                , MonadReader(ask)
-                                                , ReaderT
-                                                , asks
-                                                , local
-                                                )
-import           Data.Int                       ( Int64 )
-import qualified Data.List                     as List
-import qualified Data.Map.Strict               as M
-import           Data.Maybe                     ( catMaybes )
-import           Data.Text                      ( Text(..) )
-import           Data.Text                     as T
-import           Database.Esqueleto.Experimental
-import           Database.Esqueleto.Experimental.From.SqlSetOperation
-                                                ( SqlSetOperation
-                                                    ( unSqlSetOperation
-                                                    )
-                                                )
-import           Database.Persist               ( Filter(..)
-                                                , deleteWhere
-                                                , insertMany
-                                                )
-import           Database.Persist.Sql           ( runSqlConn )
-import           Database.Persist.Sqlite        ( runSqlite
-                                                , withSqliteConn
-                                                )
-import           MdGraph.App                    ( App(App)
-                                                , Env(config)
-                                                )
-import           MdGraph.Config                 ( Config(dbConnString) )
-import           UnliftIO.Resource              ( ResourceT(..) )
+import Aux.Common (batch)
+import Control.Monad (mapM)
+import Control.Monad.Logger (NoLoggingT (..))
+import Control.Monad.Reader
+  ( MonadIO (liftIO),
+    MonadReader (ask),
+    ReaderT,
+  )
+import Data.Int (Int64)
+import qualified Data.List as List
+import qualified Data.Map.Strict as M
+import Data.Maybe (catMaybes, fromMaybe, isJust)
+import Data.Text (Text (..))
+import Data.Text as T
+import Database.Esqueleto.Experimental
+import Database.Esqueleto.Experimental.From.SqlSetOperation
+  ( SqlSetOperation
+      ( unSqlSetOperation
+      ),
+  )
+import Database.Persist
+  ( Filter (..),
+    deleteWhere,
+    insertMany,
+  )
+import Database.Persist.Sql (runSqlConn)
+import Database.Persist.Sqlite
+  ( runSqlite,
+    withSqliteConn,
+  )
+import MdGraph.App
+  ( App (App),
+    Env (config),
+  )
+import MdGraph.Config (Config (dbConnString))
+import MdGraph.Persist.Schema
+import UnliftIO.Resource (ResourceT (..))
 
 insertEdges :: [Edge] -> Query [Key Edge]
 insertEdges edges = insertMany edges
@@ -65,56 +67,63 @@ insertTags tags = insertMany tags
 
 insertDocuments :: [Document] -> Query (M.Map (Key Document) Document)
 insertDocuments docs = do
-    keys <- insertMany docs
-    let keyBatches = batch 500 keys
-    aoeu <- sequence (getMany <$> keyBatches)
-    return $ List.foldr M.union M.empty aoeu
+  keys <- insertMany docs
+  let keyBatches = batch 500 keys
+  aoeu <- sequence (getMany <$> keyBatches)
+  return $ List.foldr M.union M.empty aoeu
 
 insertTempDocuments :: [TempDocument] -> Query [Key TempDocument]
 insertTempDocuments docs = do
-    deleteWhere ([] :: [Filter TempDocument])
-    insertMany docs
+  deleteWhere ([] :: [Filter TempDocument])
+  insertMany docs
 
 -- | Find items in Temp not in Doc
 modifiedFiles :: Query [(Entity Document, Entity TempDocument)]
 modifiedFiles = select $ do
-    (file :& tempFile) <-
-        from $ table @Document `InnerJoin` table @TempDocument `on` do
-            \(file :& tempFile) ->
-                file ^. DocumentPath ==. tempFile ^. TempDocumentPath
-    where_
-        $  (file ^. DocumentModifiedAt)
-        <. (tempFile ^. TempDocumentModifiedAt)
-    pure (file, tempFile)
+  (file :& tempFile) <-
+    from $
+      table @Document
+        `InnerJoin` table @TempDocument `on` do
+          \(file :& tempFile) ->
+            file ^. DocumentPath ==. tempFile ^. TempDocumentPath
+  where_ $
+    (file ^. DocumentModifiedAt)
+      <. (tempFile ^. TempDocumentModifiedAt)
+  pure (file, tempFile)
 
 -- | Find items in Temp not in Doc
 newFiles :: Query [Entity TempDocument]
 newFiles = select $ do
-    (tempFile :& file) <-
-        from
-        $          table @TempDocument
+  (tempFile :& file) <-
+    from $
+      table @TempDocument
         `leftJoin` table @Document
-        `on`       \(tempFile :& file) ->
-                       just (tempFile ^. TempDocumentPath) ==. file ?. DocumentPath
-    where_ $ isNothing (file ?. DocumentPath)
-    pure tempFile
+          `on` \(tempFile :& file) ->
+            just (tempFile ^. TempDocumentPath) ==. file ?. DocumentPath
+  where_ $ isNothing (file ?. DocumentPath)
+  pure tempFile
 
 -- | Must be called after pruneDeletedDocuments! Delete TempDocs that have not
 -- been modified
 pruneUnchangedTempDocs :: Query Int64
 pruneUnchangedTempDocs = deleteCount $ do
-    tempDoc <- from $ table @TempDocument
-    where_ $ tempDoc ^. TempDocumentPath `in_` subSelectList
-        (do
+  tempDoc <- from $ table @TempDocument
+  where_ $
+    tempDoc
+      ^. TempDocumentPath
+      `in_` subSelectList
+        ( do
             (doc :& tempDoc) <-
-                from $ table @Document `InnerJoin` table @TempDocument `on` do
+              from $
+                table @Document
+                  `InnerJoin` table @TempDocument `on` do
                     \(doc :& tempDoc) ->
-                        (doc ^. DocumentPath ==. tempDoc ^. TempDocumentPath)
-                            &&. (   doc
-                                ^.  DocumentModifiedAt
+                      (doc ^. DocumentPath ==. tempDoc ^. TempDocumentPath)
+                        &&. ( doc
+                                ^. DocumentModifiedAt
                                 ==. tempDoc
-                                ^.  TempDocumentModifiedAt
-                                )
+                                  ^. TempDocumentModifiedAt
+                            )
             pure $ doc ^. DocumentPath
         )
 
@@ -123,13 +132,16 @@ pruneUnchangedTempDocs = deleteCount $ do
 -- document's Tags and Edges
 pruneDeletedDocuments :: Query Int64
 pruneDeletedDocuments = deleteCount $ do
-    file <- from $ table @Document
-    whereDocumentDeleted file
+  file <- from $ table @Document
+  whereDocumentDeleted file
 
 -- | Documents that are not in TempDocuments
 whereDocumentDeleted file = do
-    where_ $ file ^. DocumentPath `notIn` subSelectList
-        (do
+  where_ $
+    file
+      ^. DocumentPath
+      `notIn` subSelectList
+        ( do
             tf <- from $ table @TempDocument
             pure $ tf ^. TempDocumentPath
         )
@@ -139,81 +151,132 @@ whereDocumentDeleted file = do
 -- run (we will have to delete them anyway)
 pruneModifiedDocs :: Query Int64
 pruneModifiedDocs = deleteCount $ do
-    file <- from $ table @Document
-    where_ $ file ^. DocumentPath `in_` subSelectList
-        (do
+  file <- from $ table @Document
+  where_ $
+    file
+      ^. DocumentPath
+      `in_` subSelectList
+        ( do
             (doc :& tempDoc) <-
-                from $ table @Document `InnerJoin` table @TempDocument `on` do
+              from $
+                table @Document
+                  `InnerJoin` table @TempDocument `on` do
                     \(doc :& tempDoc) ->
-                        (doc ^. DocumentPath ==. tempDoc ^. TempDocumentPath)
-                            &&. (  doc
+                      (doc ^. DocumentPath ==. tempDoc ^. TempDocumentPath)
+                        &&. ( doc
                                 ^. DocumentModifiedAt
                                 <. tempDoc
-                                ^. TempDocumentModifiedAt
-                                )
+                                  ^. TempDocumentModifiedAt
+                            )
             pure $ doc ^. DocumentPath
         )
 
 -- | Files with no incoming or outgoing edges
 orphansM :: Query [Entity Document]
 orphansM = select $ do
-    from
-        $         from (table @Document)
-        `except_` filesThatHaveLinks
-        `except_` filesThatAreLinkedTo
+  from $
+    from (table @Document)
+      `except_` filesThatHaveLinks
+      `except_` filesThatAreLinkedTo
 
 filesThatAreLinkedTo = do
-    (file :& edge) <- from $ table @Document `InnerJoin` table @Edge `on` do
-        \(doc :& edge) -> doc ^. DocumentPath ==. edge ^. EdgeHead
-    pure file
+  (file :& edge) <-
+    from $
+      table @Document
+        `InnerJoin` table @Edge `on` do
+          \(doc :& edge) -> doc ^. DocumentPath ==. edge ^. EdgeHead
+  pure file
 
 filesThatHaveLinks = do
-    (file :& edge) <- from $ table @Document `InnerJoin` table @Edge `on` do
-        \(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail
-    pure file
+  (file :& edge) <-
+    from $
+      table @Document
+        `InnerJoin` table @Edge `on` do
+          \(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail
+  pure file
 
--- | Files with no incoming edges (but may have outgoing 
+-- | Files with no incoming edges (but may have outgoing
 unreachableM :: Query [Entity Document]
 unreachableM =
-    select
-        $ do
-              from
-        $ (filesThatHaveLinks `except_` filesThatAreLinkedTo)
+  select
+    $ do
+      from
+    $ (filesThatHaveLinks `except_` filesThatAreLinkedTo)
 
+-- | This should support static files too
 backwardLinks :: FilePath -> Query [Entity Document]
 backwardLinks docPath = select $ do
-    (childDoc :& edge :& parentDoc) <-
-        from
-        $           table @Document
+  (childDoc :& edge :& parentDoc) <-
+    from $
+      table @Document
         `innerJoin` table @Edge
-        `on`        (\(cd :& e) -> cd ^. DocumentPath ==. e ^. EdgeHead)
+          `on` (\(cd :& e) -> cd ^. DocumentPath ==. e ^. EdgeHead)
         `innerJoin` table @Document
-        `on`        (\(_ :& e :& pd) -> pd ^. DocumentId ==. e ^. EdgeTail)
-    where_ (childDoc ^. DocumentPath ==. val docPath)
-    pure parentDoc
+          `on` (\(_ :& e :& pd) -> pd ^. DocumentId ==. e ^. EdgeTail)
+  where_ (childDoc ^. DocumentPath ==. val docPath)
+  pure parentDoc
 
-forwardLinks :: FilePath -> Query [Entity Document]
+-- Can't distinguish between static files and nonexistent files. Their edges will be recorded, but neither of them will have records in the Document table. I guess we could grab the documents that we can find, and filter nonexistent and static files in/out after doing the query. Or we could store the Document type
+forwardLinks' :: FilePath -> Query [Entity Edge]
+forwardLinks' docPath = do
+  edges <- select $ do
+    (edge :& parentDoc) <-
+      from $
+        table @Edge
+          `innerJoin` table @Document
+            `on` (\(edge :& parentDoc') -> parentDoc' ^. DocumentId ==. edge ^. EdgeTail)
+    -- `leftJoin` table @Document
+    --   `on` ( \(_ :& edge :& doc) ->
+    --            just (edge ^. EdgeHead) ==. doc ?. DocumentPath
+    --        )
+    where_ (parentDoc ^. DocumentPath ==. val docPath)
+    pure edge
+  return edges
+
+-- forwardLinks :: FilePath -> Query [Entity Edge]
+-- forwardLinks docPath = do
+--   edges <- select $ do
+--     (parentDoc :& edge) <-
+--       from $
+--         table @Document
+--           `innerJoin` table @Edge
+--             `on` (\(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail)
+--           -- `leftJoin` table @Document
+--           --   `on` ( \(_ :& edge :& doc) ->
+--           --            just (edge ^. EdgeHead) ==. doc ?. DocumentPath
+--           --        )
+--     where_ (parentDoc ^. DocumentPath ==. val docPath)
+--     pure edge
+--   return $ catMaybes edges
+
+-- | For a given document path, finds its outgoing edges. If the edge points to
+-- a document, returns that (Right). Otherwise returns the Edge (Left)
+forwardLinks :: FilePath -> Query [Either (Entity Edge) (Entity Document)]
 forwardLinks docPath = do
-    documents <- select $ do
-        (parentDoc :& edge :& childDoc) <-
-            from
-            $           table @Document
-            `innerJoin` table @Edge
+  documents <- select $ do
+    (parentDoc :& edge :& childDoc) <-
+      from $
+        table @Document
+          `innerJoin` table @Edge
             `on` (\(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail)
-            `leftJoin`  table @Document
-            `on`        (\(_ :& edge :& doc) ->
-                            just (edge ^. EdgeHead) ==. doc ?. DocumentPath
-                        )
-        where_ (parentDoc ^. DocumentPath ==. val docPath)
-        pure childDoc
-    return $ catMaybes documents
-
+          `leftJoin` table @Document
+            `on` ( \(_ :& edge :& doc) ->
+                     just (edge ^. EdgeHead) ==. doc ?. DocumentPath
+                 )
+    where_ (parentDoc ^. DocumentPath ==. val docPath)
+    -- let aoeu = maybe (Left edge) Right childDoc
+    pure (childDoc, edge)
+  -- return $ catMaybes documents
+  let documentOrEdge = Prelude.map (\(doc, edge) -> maybe (Left edge) Right doc) documents
+  return documentOrEdge
 
 -- | Edges without associated files
-nonexistant :: Query [Entity Edge]
-nonexistant = select $ do
-    (edge :& doc) <-
-        from $ table @Edge `leftJoin` table @Document `on` \(edge :& doc) ->
-            just (edge ^. EdgeTail) ==. doc ?. DocumentId
-    where_ $ isNothing (doc ?. DocumentPath)
-    pure edge
+nonexistent :: Query [Entity Edge]
+nonexistent = select $ do
+  (edge :& doc) <-
+    from $
+      table @Edge
+        `leftJoin` table @Document `on` \(edge :& doc) ->
+          just (edge ^. EdgeHead) ==. doc ?. DocumentPath
+  where_ $ isNothing (doc ?. DocumentPath)
+  pure edge

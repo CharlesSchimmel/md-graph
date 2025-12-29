@@ -1,58 +1,83 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use uncurry" #-}
 module MdGraph.File
-    ( Files(..)
-    ) where
+  ( Files (..),
+    normaliseEvil,
+    unrelativize,
+    isAncestorOf,
+  )
+where
 
-import           Control.Applicative
-import           Control.Concurrent.Async       ( mapConcurrently )
-import           Control.Monad                  ( join )
-import           Control.Monad.IO.Class         ( liftIO )
-import           Control.Monad.Reader           ( asks )
-import           Control.Monad.Trans.Maybe
-import           Data.Foldable
-import           Data.Hashable                  ( Hashable )
-import qualified Data.List
-import           Data.Maybe
-import           Data.Text                     as T
-                                                ( pack
-                                                , unwords
-                                                )
-import           Data.Time                      ( UTCTime )
-import           Data.Traversable              as T
-import           MdGraph.App                    ( App(App) )
-import           Prelude                       as P
-import           System.Directory              as D
-import           System.FilePath               as F
-
-import           MdGraph.App.Logger             ( logDebug )
-import           MdGraph.Config                 ( Config(..)
-                                                , HasConfig(getConfig)
-                                                )
-import qualified MdGraph.File.Internal         as Internal
-import           MdGraph.File.Internal          ( File(..) )
-import           MdGraph.Util                   ( trace' )
+import Control.Monad.IO.Class (liftIO)
+import MdGraph.App (App (App))
+import MdGraph.Config
+  ( Config (..),
+    HasConfig (getConfig),
+  )
+import qualified MdGraph.File.Internal as Internal
+import MdGraph.File.Types
+import System.FilePath
+import qualified System.FilePath as FilePath
 
 class Files m where
+  -- | Detilde and ensure the given path is absolute. Does not check for file existence.
   trueAbsolutePath :: FilePath -> m FilePath
+
+  -- | Check if a FilePath exists; Nothing if it doesn't, Just FilePath if it does.
   maybeFile :: FilePath -> m (Maybe FilePath)
+
+  -- | Find all documents
   findDocuments :: m [File]
-  relativizeWithExtension :: FilePath -> FilePath -> m FilePath
-  -- | Fix the document path if it resolves with an extension
-  getQualifiedDocumentPath :: FilePath -> m FilePath
 
 instance Files App where
-    trueAbsolutePath = liftIO . Internal.trueAbsolutePathIO
-    maybeFile        = liftIO . Internal.maybeFile
-    relativizeWithExtension source dest = do
-        Config { defaultExtension } <- getConfig
-        fixedLink <- liftIO $ Internal.fixLink defaultExtension source dest
-        logDebug . T.pack . show $ fixedLink
-        return fixedLink
-    findDocuments = do
-        config@Config {..} <- getConfig
-        liftIO $ Internal.findDocuments defaultExtension [libraryPath]
-    getQualifiedDocumentPath path = do
-        Config {..} <- getConfig
-        -- what about subdirs
-        let withExtension = trace' $ path <.> defaultExtension
-        maybeFullPathWithExtension <- maybeFile (libraryPath </> withExtension)
-        return $ maybe path (const withExtension) maybeFullPathWithExtension
+  trueAbsolutePath = liftIO . Internal.trueAbsolutePathIO
+  maybeFile = liftIO . Internal.maybeFile
+
+  -- Never used
+  findDocuments = do
+    config@Config {..} <- getConfig
+    liftIO $ Internal.findDocuments defaultExtension [libraryPath]
+
+-- TODO: Enforce source and dest as absolute _files_ (not dirs?)?
+-- TODO: Detilde before reaching this function
+
+-- | When an "source" file references a "dest" file, it may reference it
+-- relative to itself. For example, the source file "\/foo\/bar\/baz.md" might
+-- reference the destination "qux.md". We need the destination's path to become
+-- "\/foo\/bar\/qux.md"
+unrelativize :: AbsolutePath -> DestFilePath -> AbsolutePath
+unrelativize (AbsolutePath source) dest
+  | FilePath.isAbsolute dest = AbsolutePath dest
+  | otherwise = normaliseEvil $ AbsolutePath unnormalisedDestDir
+  where
+    sourceDir = FilePath.takeDirectory source
+    unnormalisedDestDir = sourceDir FilePath.</> dest
+
+-- TODO: Just use canonicalizePath from System.Directory? That handles symlinks. It doesn't collapse the directory if it doesn't exist though, which doesn't work for testing.
+
+-- | Normalise "./" and "../" in an absolute filepathh
+-- This function is "evil" because it doesn't handle symlinks. In the real world /foo/../bar is not necessarily /bar.
+normaliseEvil :: AbsolutePath -> AbsolutePath
+normaliseEvil (AbsolutePath path) =
+  let firstPassNormalisation = FilePath.normalise path -- System.FilePath.normalise handles more than just simplifying "./"
+      pathParts = FilePath.splitDirectories firstPassNormalisation
+      fullyNormalisedParts = _normalise [] pathParts
+      rebuiltPath = foldl (</>) "/" fullyNormalisedParts
+   in AbsolutePath rebuiltPath
+  where
+    _normalise :: [FilePath] -> [FilePath] -> [FilePath]
+    _normalise (prev : acc) (".." : rem) = _normalise acc rem
+    _normalise [] (".." : rem) = _normalise [] rem
+    _normalise acc ("." : rem) = _normalise acc rem
+    _normalise acc (cur : rem) = _normalise (cur : acc) rem
+    _normalise acc [] = reverse acc
+
+-- | Check if parentPath is in the tree of childPath, ex `\/foo` is in an ancestor of \/foo\/bar.md
+isAncestorOf :: AbsolutePath -> AbsolutePath -> Bool
+isAncestorOf (AbsolutePath parentPath) (AbsolutePath childPath) =
+  let parentDirs = FilePath.splitDirectories parentPath
+      childDirs = FilePath.splitDirectories childPath
+      zipped = zip parentDirs childDirs
+      commonDirs = takeWhile (\(parentDir, childDir) -> parentDir == childDir) zipped
+   in length parentDirs == length commonDirs
