@@ -46,6 +46,7 @@ _populate targets doPruneDeleted = do
   -- find documents
   logDebug "Finding documents"
   rawFoundFiles <- findDocuments targets
+
   let foundDocuments = fmap (mkFoundDocument libraryPath) rawFoundFiles
   let totalCt = Foldable.length foundDocuments
   let relativeFileMap = Map.fromList' fdRelativePath foundDocuments

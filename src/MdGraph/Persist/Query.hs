@@ -19,6 +19,7 @@ module MdGraph.Persist.Query
     forwardLinks,
     backwardLinks,
     deleteDocuments,
+    getAllDocuments,
   )
 where
 
@@ -34,8 +35,9 @@ import Data.Int (Int64)
 import qualified Data.List as List
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, fromMaybe, isJust)
+import Data.Monoid (All (getAll))
 import Data.Text (Text (..))
-import Data.Text as T
+import Data.Text as T hiding (count)
 import Database.Esqueleto.Experimental
 import Database.Esqueleto.Experimental.From.SqlSetOperation
   ( SqlSetOperation
@@ -59,6 +61,11 @@ import MdGraph.App
 import MdGraph.Config (Config (dbConnString))
 import MdGraph.Persist.Schema
 import UnliftIO.Resource (ResourceT (..))
+
+getAllDocuments :: Query [Entity Document]
+getAllDocuments = select $ do
+  doc <- from $ table @Document
+  return doc
 
 insertEdges :: [Edge] -> Query [Key Edge]
 insertEdges edges = insertMany edges
@@ -205,7 +212,7 @@ filesThatHaveLinks = do
           \(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail
   pure file
 
--- | Files with no incoming edges (but may have outgoing
+-- | Files with no incoming edges (but may have outgoing)
 unreachableM :: Query [Entity Document]
 unreachableM =
   select

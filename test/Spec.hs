@@ -1,7 +1,11 @@
+{-# HLINT ignore "Eta reduce" #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Eta reduce" #-}
 import Aux.Common
+import Constants (linkChain1_md)
 import qualified Constants
 import Control.Exception
 import Control.Monad
@@ -9,6 +13,8 @@ import Data.Either
 import Data.Function ((&))
 import Data.Text as Text
 import qualified Data.Text.IO as Text
+import Database.Esqueleto (Value (unValue))
+import Database.Esqueleto.Experimental
 import Database.Persist.Sqlite (Entity (entityVal), runSqlite)
 import qualified FilesSpec
 import MdGraph (mdGraph)
@@ -21,8 +27,8 @@ import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
 import MdGraph.File.Types (AbsolutePath (..), File (..))
 import MdGraph.Node (Link (..))
 import MdGraph.Persist.Class (Queries (getForwardLinks))
-import MdGraph.Persist.Query (forwardLinks)
-import MdGraph.Persist.Schema (Document (documentPath))
+import MdGraph.Persist.Query (forwardLinks, getAllDocuments, orphansM, unreachableM)
+import MdGraph.Persist.Schema (Document (documentPath), EntityField (..))
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base
 import qualified SubgraphSpec
@@ -139,47 +145,28 @@ main = do
 populateSpec :: Spec
 populateSpec = do
   describe "Populate" $ do
-    it "Populate" $ do
+    it "User can specify specific files to populate and parse" $ do
       libraryDir <- getLibraryDir
-      withTempDb $ \args -> do
-        -- let args = defaultSpecArgs {argLogLevel = LogLevel.Debug}
+      withTempDbFile $ \args -> do
         let dbPath = dbFile $ argDatabase args
-        let fileUnderTest = libraryDir </> Constants.linkChain1_md
-        let command = Populate $ PopulateTargets {popTargets = [fileUnderTest]}
-        let args' = args {argCommand = command, argLogLevel = LogLevel.Debug}
+
+        -- Populate only linkChain2_md
+        let command = Populate $ PopulateTargets {popTargets = [libraryDir </> Constants.linkChain2_md]}
+        let args' = args {argCommand = command}
+        mdGraph args'
+
+        -- It should be returned as unreachable (even though linkChain1_md links to it).
+        rawQueryResults <- runSqlite dbPath $ getAllDocuments
+        let dbDocuments = fmap documentPath $ entityVal <$> rawQueryResults
+        dbDocuments `shouldContain` [Constants.linkChain2_md]
+        dbDocuments `shouldNotContain` [Constants.linkChain1_md]
+
+        -- Populate linkChain1
+        let command = Populate $ PopulateTargets {popTargets = [libraryDir </> Constants.linkChain1_md]}
+        let args' = args {argCommand = command}
         _ <- mdGraph args'
 
+        -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md
         rawQueryResults <- runSqlite dbPath $ forwardLinks Constants.linkChain1_md
         let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
-        queryResultPaths `shouldContain` [Constants.linkChain1_md]
-
-        return ()
-
-withTempDb :: (Arguments -> IO a) -> IO a
-withTempDb fn = do
-  tempDir <- getTemporaryDirectory
-  let acquire =
-        do
-          (path, handle) <- System.IO.openTempFileWithDefaultPermissions tempDir "mdgraph.db"
-          Text.putStrLn . Text.unwords $ ["Using temp db file", Text.pack path]
-          System.IO.hClose handle -- we don't actually need the handle, we Just want the path
-          return path
-  -- let acquire =
-  --       do
-  --         -- blahH <- System.IO.openFile "/tmp/blah.db" System.IO.ReadWriteMode
-  --         -- return ("/tmp/blah.db", blahH)
-  --         return ("/tmp/blah.db", ())
-  let run tempDbPath =
-        let argsWithTempDb = defaultSpecArgs {argDatabase = DbFile . Text.pack $ tempDbPath}
-         in fn argsWithTempDb
-  let release tempDbPath =
-        do
-          -- hClose tempDbHandle
-          System.Directory.removeFile tempDbPath
-          return ()
-  -- acquire >>= run
-
-  bracket
-    acquire
-    release
-    run
+        queryResultPaths `shouldContain` [Constants.linkChain2_md]

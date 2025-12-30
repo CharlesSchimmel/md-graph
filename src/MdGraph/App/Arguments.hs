@@ -6,6 +6,7 @@ module MdGraph.App.Arguments
   ( Arguments (..),
     DatabaseArg (..),
     cliArguments,
+    PopOpt (..),
   )
 where
 
@@ -85,6 +86,16 @@ parseCommand =
           "populate"
           (info (Populate <$> parsePopulateOptions) $ progDesc "Just populate the database")
     )
+
+data PopOpt = PopAll | PopFile [FilePath] | PopNone
+  deriving (Show)
+
+popOptions2 :: Parser PopOpt
+popOptions2 =
+  let optAll = flag' PopAll (long "pall" <> help "Populate all")
+      optNone = flag' PopNone (long "pnone" <> help "Populate all")
+      optFile = PopFile <$> some (strOption (long "pfile" <> help "Populate file"))
+   in (optAll <|> optNone <|> optFile)
 
 parsePopulateOptions :: Parser PopulateOptions
 parsePopulateOptions =
