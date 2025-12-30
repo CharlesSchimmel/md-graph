@@ -2,7 +2,7 @@
 
 module Aux.Map where
 
-import Aux.Functor
+import Aux.Common
 import Aux.Tuple
   ( mapSnd,
     mapToFst,

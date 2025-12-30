@@ -1,4 +1,4 @@
-module MdGraph.Populate where
+module MdGraph.Populate (populate) where
 
 import Aux.Map as Map
 import Control.Applicative (Alternative (..), Applicative (..), (<$>))
@@ -33,6 +33,7 @@ import System.FilePath
   )
 import Prelude as P
 
+-- | Scan for Documents, parse them for Edges and Tags, and populate the database with changes.
 populate ::
   (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m) =>
   PopulateOptions ->

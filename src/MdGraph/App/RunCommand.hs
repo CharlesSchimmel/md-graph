@@ -5,8 +5,7 @@
 
 module MdGraph.App.RunCommand where
 
-import qualified Aux.Functor
-import Aux.HashSet
+import Aux.Common
 import Control.Applicative (Alternative ((<|>)), Applicative (liftA2))
 import Control.Exception (throwIO)
 import Control.Monad (join)
@@ -82,7 +81,7 @@ runPopulate (PopulateTargets targets) = do
   logDebug "Populating TempDocuments"
   _ <- insertTempDocuments $ Mapper.fromFile <$> foundDocuments
 
-  let foundRelativePaths = Aux.Functor.for foundDocuments $ \File {relativePath} -> unRelativePath relativePath
+  let foundRelativePaths = for foundDocuments $ \File {relativePath} -> unRelativePath relativePath
   deletedDocumentCount <- deleteDocuments foundRelativePaths
 
   logDebug "Pruning unchanged TempDocuments"

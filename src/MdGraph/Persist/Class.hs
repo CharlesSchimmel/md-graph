@@ -44,6 +44,7 @@ class PreparesDb m where
   -- | Must be called after pruneDeletedDocuments! Delete TempDocs that have not been modified
   pruneUnchangedTempDocuments :: m Int64
 
+  -- | Delete Documents that do not exist in TempDocuments
   pruneDeletedDocuments :: m Int64
 
   -- | Delete modified Documents (modified determined when the TempDoc

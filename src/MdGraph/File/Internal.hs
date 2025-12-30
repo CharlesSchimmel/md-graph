@@ -10,8 +10,7 @@
 
 module MdGraph.File.Internal where
 
-import Aux.Common (maybeTester)
-import qualified Aux.Functor as Functor
+import Aux.Common
 import Control.Applicative
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Monad as Monad
@@ -23,7 +22,7 @@ import Data.Hashable (Hashable)
 import qualified Data.List as List
 import Data.Maybe
 import Data.Time (UTCTime)
-import Data.Traversable as T
+import qualified Data.Traversable as Traversable
 import GHC.Generics (Generic)
 import MdGraph.File.Types
 import MdGraph.Util
@@ -51,7 +50,7 @@ maybeDirectory dir = maybeTester D.doesDirectoryExist dir
 findDocuments ::
   DefaultExtension -> [AbsolutePath] -> IO [File]
 findDocuments defaultExt sourcePaths = do
-  maybeFiles <- T.mapM (traverseDir defaultExt . unAbsolutePath) sourcePaths
+  maybeFiles <- Traversable.mapM (traverseDir defaultExt . unAbsolutePath) sourcePaths
   let unmaybedFiles = catMaybes maybeFiles
   return $ Monad.join unmaybedFiles
 
@@ -71,9 +70,9 @@ getPathType path = do
 traverseDir :: FileExtension -> FilePath -> IO (Maybe [File])
 traverseDir extension basePath = do
   pathType <- getPathType basePath
-  maybeExpandResults <- T.sequence $ expand extension <$> pathType
-  let fileResults = Functor.for maybeExpandResults $
-        \expandResults -> Functor.for expandResults $
+  maybeExpandResults <- Traversable.sequence $ expand extension <$> pathType
+  let fileResults = for maybeExpandResults $
+        \expandResults -> for expandResults $
           \expandResult -> expandResultToFile basePath expandResult
   return fileResults
 
