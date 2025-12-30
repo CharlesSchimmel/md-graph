@@ -1,36 +1,32 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Eta reduce" #-}
+import Aux.Common
 import qualified Constants
-import Control.Exception (evaluate)
-import qualified Control.Exception as E
-import Control.Monad (unless)
-import Control.Monad.Except (runExceptT)
-import Control.Monad.Identity (Identity (runIdentity))
-import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
-import Data.Either (fromRight, isRight)
-import qualified Data.Text as T
-import Database.Persist.Sqlite (runSqlPersistM, wrapConnection)
-import Database.Sqlite (open)
+import Control.Exception
+import Control.Monad
+import Data.Either
+import Data.Function ((&))
+import Data.Text as Text
+import qualified Data.Text.IO as Text
+import Database.Persist.Sqlite (Entity (entityVal), runSqlite)
 import qualified FilesSpec
 import MdGraph (mdGraph)
-import qualified MdGraph
-import MdGraph.App (App (runApp), Env (Env))
-import MdGraph.App.Arguments (Arguments (..))
-import qualified MdGraph.App.Arguments as Arguments
-import MdGraph.App.Command (BacklinkOptions (..), Command (..), SubgraphOptions (..), SubgraphTarget (..), backlinksDefaultMaxDepth, backlinksDefaultMinDepth, subgraphDefaultMaxDepth, subgraphDefaultMinDepth)
-import qualified MdGraph.App.Command as Command
+import MdGraph.App.Arguments
+import MdGraph.App.Command as Command
 import qualified MdGraph.App.LogLevel as LogLevel
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config (Config (Config, libraryPath))
 import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
 import MdGraph.File.Types (AbsolutePath (..), File (..))
 import MdGraph.Node (Link (..))
+import MdGraph.Persist.Class (Queries (getForwardLinks))
+import MdGraph.Persist.Query (forwardLinks)
+import MdGraph.Persist.Schema (Document (documentPath))
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base
 import qualified SubgraphSpec
-import System.Directory (getCurrentDirectory)
+import System.Directory (getCurrentDirectory, getTemporaryDirectory, removeFile)
 import System.FilePath
 import System.IO
 import Test.Hspec
@@ -43,6 +39,7 @@ main = do
   libraryDir <- getLibraryDir
   hspec FilesSpec.spec
   hspec $ SubgraphSpec.spec libraryDir
+  hspec $ populateSpec
   hspec $ do
     let baseSgOptions =
           SubgraphOptions
@@ -141,6 +138,48 @@ main = do
 
 populateSpec :: Spec
 populateSpec = do
-  it "Populate" $ do
-    tempFile <- System.IO.openTempFile "/tmp/" "mdgraph.db"
-    shouldSatisfy True id
+  describe "Populate" $ do
+    it "Populate" $ do
+      libraryDir <- getLibraryDir
+      withTempDb $ \args -> do
+        -- let args = defaultSpecArgs {argLogLevel = LogLevel.Debug}
+        let dbPath = dbFile $ argDatabase args
+        let fileUnderTest = libraryDir </> Constants.linkChain1_md
+        let command = Populate $ PopulateTargets {popTargets = [fileUnderTest]}
+        let args' = args {argCommand = command, argLogLevel = LogLevel.Debug}
+        _ <- mdGraph args'
+
+        rawQueryResults <- runSqlite dbPath $ forwardLinks Constants.linkChain1_md
+        let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
+        queryResultPaths `shouldContain` [Constants.linkChain1_md]
+
+        return ()
+
+withTempDb :: (Arguments -> IO a) -> IO a
+withTempDb fn = do
+  tempDir <- getTemporaryDirectory
+  let acquire =
+        do
+          (path, handle) <- System.IO.openTempFileWithDefaultPermissions tempDir "mdgraph.db"
+          Text.putStrLn . Text.unwords $ ["Using temp db file", Text.pack path]
+          System.IO.hClose handle -- we don't actually need the handle, we Just want the path
+          return path
+  -- let acquire =
+  --       do
+  --         -- blahH <- System.IO.openFile "/tmp/blah.db" System.IO.ReadWriteMode
+  --         -- return ("/tmp/blah.db", blahH)
+  --         return ("/tmp/blah.db", ())
+  let run tempDbPath =
+        let argsWithTempDb = defaultSpecArgs {argDatabase = DbFile . Text.pack $ tempDbPath}
+         in fn argsWithTempDb
+  let release tempDbPath =
+        do
+          -- hClose tempDbHandle
+          System.Directory.removeFile tempDbPath
+          return ()
+  -- acquire >>= run
+
+  bracket
+    acquire
+    release
+    run

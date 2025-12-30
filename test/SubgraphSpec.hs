@@ -2,36 +2,13 @@ module SubgraphSpec (spec) where
 
 {-# HLINT ignore "Eta reduce" #-}
 import qualified Constants
-import Control.Exception (evaluate)
-import qualified Control.Exception as E
-import Control.Monad (unless)
-import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
-import Data.Either (fromRight, isRight)
-import qualified Data.Text as T
-import Database.Persist.Sqlite (runSqlPersistM, wrapConnection)
-import Database.Sqlite (open)
-import qualified FilesSpec
-import MdGraph (mdGraph)
-import qualified MdGraph
-import MdGraph.App (App (runApp), Env (Env))
-import MdGraph.App.Arguments (Arguments (..))
-import qualified MdGraph.App.Arguments as Arguments
-import MdGraph.App.Command (BacklinkOptions (..), Command (..), SubgraphOptions (..), SubgraphTarget (..), backlinksDefaultMaxDepth, backlinksDefaultMinDepth, subgraphDefaultMaxDepth, subgraphDefaultMinDepth)
-import qualified MdGraph.App.Command as Command
-import qualified MdGraph.App.LogLevel as LogLevel
-import MdGraph.App.RunCommand (runCommand)
-import MdGraph.Config (Config (Config, libraryPath))
-import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
-import MdGraph.File.Types (AbsolutePath (..), File (..))
-import MdGraph.Node (Link (..))
+import MdGraph
+import MdGraph.App.Arguments
+import MdGraph.App.Command
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base
-import System.Directory (getCurrentDirectory)
 import System.FilePath
 import Test.Hspec
-import Test.Hspec.Contrib.HUnit
-import Test.Hspec.QuickCheck
-import Prelude
 
 main :: IO ()
 main = do

@@ -46,6 +46,7 @@ _populate targets doPruneDeleted = do
   foundDocuments <- findDocuments targets
   let totalCt = Foldable.length foundDocuments
   let relativeFileMap = Map.fromList' relativePath foundDocuments
+  logDebug . Text.pack . show $ relativeFileMap
 
   -- load all found documents into temp
   logDebug "Populating TempDocuments"
