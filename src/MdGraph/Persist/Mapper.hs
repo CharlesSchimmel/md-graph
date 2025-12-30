@@ -14,13 +14,13 @@ import MdGraph.Persist.Schema
 class FromFile a where
   fromFile :: File.File -> a
 
-instance FromFile Document where
-  fromFile File.File {relativePath, modificationTime} =
-    Document (File.unRelativePath relativePath) modificationTime
+-- instance FromFile Document where
+--   fromFile File.File {modificationTime} =
+--     Document (File.unRelativePath relativePath) modificationTime
 
-instance FromFile TempDocument where
-  fromFile File.File {relativePath, modificationTime} =
-    TempDocument (File.unRelativePath relativePath) modificationTime
+-- instance FromFile TempDocument where
+--   fromFile File.File {modificationTime} =
+--     TempDocument (File.unRelativePath relativePath) modificationTime
 
 class FromTempDocument a where
   fromTempDocument :: TempDocument -> a

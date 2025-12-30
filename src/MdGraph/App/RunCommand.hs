@@ -70,25 +70,6 @@ _runCommand (Backlinks options) = runBacklinks options
 _runCommand Statics = throwError "NYI"
 _runCommand (Populate options) = populate options >> return []
 
-runPopulate :: (Monad m, PreparesDb m, Queries m, Logs m, Files m, HasConfig m) => PopulateOptions -> m [String]
-runPopulate PopulateAll = pure mempty
-runPopulate (PopulateTargets targets) = do
-  absoluteTargetPaths <- Monad.mapM trueAbsolutePath targets
-
-  foundDocuments <- findDocuments absoluteTargetPaths
-  -- let unFoundDocuments = Get the documents that weren't found and delete them, if possible
-
-  logDebug "Populating TempDocuments"
-  _ <- insertTempDocuments $ Mapper.fromFile <$> foundDocuments
-
-  let foundRelativePaths = for foundDocuments $ \File {relativePath} -> unRelativePath relativePath
-  deletedDocumentCount <- deleteDocuments foundRelativePaths
-
-  logDebug "Pruning unchanged TempDocuments"
-  unchangedCt <- pruneUnchangedTempDocuments
-
-  return []
-
 runOrphans :: (Monad m, Queries m, Logs m) => m [Document]
 runOrphans = do
   orphanDocs <- getOrphans

@@ -89,5 +89,6 @@ isAncestorOf (AbsolutePath parentPath) (AbsolutePath childPath) =
       commonDirs = takeWhile (\(parentDir, childDir) -> parentDir == childDir) zipped
    in length parentDirs == length commonDirs
 
+-- | System.FilePath.makeRelative, lifted to AbsolutePaths. Returns a FilePath (not a RelativePath) because it's not guaranteed to be Relative.
 makeRelative :: AbsolutePath -> AbsolutePath -> FilePath
 makeRelative (AbsolutePath source) (AbsolutePath dest) = System.FilePath.makeRelative source dest

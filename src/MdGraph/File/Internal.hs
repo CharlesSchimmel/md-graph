@@ -73,7 +73,7 @@ traverseDir extension basePath = do
   maybeExpandResults <- Traversable.sequence $ expand extension <$> pathType
   let fileResults = for maybeExpandResults $
         \expandResults -> for expandResults $
-          \expandResult -> expandResultToFile basePath expandResult
+          \expandResult -> expandResultToFile expandResult
   return fileResults
 
 -- | Recursively explore _path_, and return files with _extension_
@@ -110,12 +110,10 @@ detilde path = do
     rejoin homePath ("~/" : pathParts) = joinPath (homePath : pathParts)
     rejoin _ pathParts = joinPath pathParts
 
-expandResultToFile :: FilePath -> ExpandResult -> File
-expandResultToFile basePath ExpandResult {resultPath, resultModTime} =
+expandResultToFile :: ExpandResult -> File
+expandResultToFile ExpandResult {resultPath, resultModTime} =
   let absResultPath = unAbsolutePath resultPath
-      relativePath = RelativePath $ makeRelative basePath absResultPath
    in File
         { absolutePath = resultPath,
-          relativePath = relativePath,
           modificationTime = resultModTime
         }

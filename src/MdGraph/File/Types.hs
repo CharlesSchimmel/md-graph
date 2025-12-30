@@ -35,7 +35,7 @@ instance Hashable AbsolutePath
 data File = File
   { absolutePath :: AbsolutePath,
     -- TODO: I don't know why this is part of this record. We can figure out the relative path after getting all of the files.
-    relativePath :: RelativePath,
+    -- relativePath :: RelativePath,
     modificationTime :: UTCTime
   }
   deriving (Show, Eq, Ord)

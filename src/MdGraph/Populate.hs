@@ -12,6 +12,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
+import Data.Time
 import Database.Persist.Sqlite
   ( Entity (entityVal),
   )
@@ -33,7 +34,7 @@ import System.FilePath
   )
 import Prelude as P
 
-type DeleteDocumentsFn m num = [File] -> m num
+type DeleteDocumentsFn m num = [FoundDocument] -> m num
 
 _populate ::
   (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m, Show num, Num num) =>
@@ -41,16 +42,24 @@ _populate ::
   DeleteDocumentsFn m num ->
   m ()
 _populate targets doPruneDeleted = do
+  Config {libraryPath} <- getConfig
   -- find documents
   logDebug "Finding documents"
-  foundDocuments <- findDocuments targets
+  rawFoundFiles <- findDocuments targets
+  let foundDocuments = fmap (mkFoundDocument libraryPath) rawFoundFiles
   let totalCt = Foldable.length foundDocuments
-  let relativeFileMap = Map.fromList' relativePath foundDocuments
+  let relativeFileMap = Map.fromList' fdRelativePath foundDocuments
   logDebug . Text.pack . show $ relativeFileMap
 
   -- load all found documents into temp
   logDebug "Populating TempDocuments"
-  insertTempDocuments $ Mapper.fromFile <$> foundDocuments
+  let tempDocuments = for foundDocuments $
+        \FoundDocument {fdModificationTime, fdRelativePath} ->
+          TempDocument
+            { tempDocumentPath = fdRelativePath,
+              tempDocumentModifiedAt = fdModificationTime
+            }
+  insertTempDocuments tempDocuments
 
   logDebug "Pruning deleted Documents"
   deletedCt <- doPruneDeleted foundDocuments
@@ -75,7 +84,7 @@ _populate targets doPruneDeleted = do
   logDebug "Inserting new and modified Documents"
   newDocs <- insertDocuments docsToInsert
 
-  let docKeyMap = Map.flop (RelativePath . documentPath) newDocs
+  let docKeyMap = Map.flop documentPath newDocs
 
   logDebug "Parsing new and modified Documents"
   logDebug . Text.pack . show $ Map.keys docKeyMap
@@ -120,7 +129,7 @@ populate (PopulateTargets targets) = do
           let foundPathsSet =
                 HashSet.fromList $
                   for foundDocuments $
-                    \File {absolutePath = fileAbsPath} -> makeRelative libraryPath fileAbsPath
+                    \FoundDocument {fdAbsolutePath = fileAbsPath} -> makeRelative libraryPath fileAbsPath
           let targetPathsSet =
                 HashSet.fromList $
                   for absoluteTargetPaths $
@@ -136,11 +145,11 @@ reportDocumentCount num reason = do
 
 parseDocumentsAndOrganizeResults ::
   (Monad m, HasConfig m, Logs m, Files m, Parses m) =>
-  [(File, Key Document)] ->
+  [(FoundDocument, Key Document)] ->
   m ([Edge], [Schema.Tag])
 parseDocumentsAndOrganizeResults filesAndDocumentToParse = do
   parseErrorOrContext <- Monad.forM filesAndDocumentToParse $ \(file, document) -> do
-    parseErrorOrResult <- parseDocument . absolutePath $ file
+    parseErrorOrResult <- parseDocument . fdAbsolutePath $ file
     return $ do
       -- Either Monad
       ParseResult {tags, links} <- parseErrorOrResult
@@ -158,7 +167,7 @@ parseDocumentsAndOrganizeResults filesAndDocumentToParse = do
     logError "Failed to parse some files" -- TODO add more detail
   let documentsAndAbsoluteLinks = postParseCtxs >>= unrollUnrelativizeLinks
 
-  let knownFilePaths = HashSet.fromList $ fmap (\(File {absolutePath}, _) -> unAbsolutePath absolutePath) filesAndDocumentToParse
+  let knownFilePaths = HashSet.fromList $ fmap (\(FoundDocument {fdAbsolutePath}, _) -> unAbsolutePath fdAbsolutePath) filesAndDocumentToParse
   documentAndRelativeLinksWithExtensions <- Monad.forM documentsAndAbsoluteLinks $ \(doc, link) -> do
     linkWithExtension <- addExtensionIfFileExists knownFilePaths link
     relativeLink <- mkLinksRelativeToLibrary linkWithExtension
@@ -176,7 +185,7 @@ parseDocumentsAndOrganizeResults filesAndDocumentToParse = do
 unrollUnrelativizeLinks :: PostParseCtx -> [(Key Document, AbsoluteLink)]
 unrollUnrelativizeLinks PostParseCtx {ppcFile, ppcDocument, ppcLinks} = do
   link <- ppcLinks
-  let (File {absolutePath = sourcePath}) = ppcFile
+  let (FoundDocument {fdAbsolutePath = sourcePath}) = ppcFile
   [(ppcDocument, unrelativizeLink sourcePath link)]
 
 -- | Use a Link's source file path to unrelativize the Link path.
@@ -231,9 +240,20 @@ mkLinksRelativeToLibrary (AbsoluteLink link@Link {linkPath, linkText}) = do
       }
 
 data PostParseCtx = PostParseCtx
-  { ppcFile :: File,
+  { ppcFile :: FoundDocument,
     ppcDocument :: Key Document,
     ppcLinks :: [Link],
     ppcTag :: [Node.Tag]
   }
   deriving (Show)
+
+data FoundDocument = FoundDocument {fdRelativePath :: FilePath, fdModificationTime :: UTCTime, fdAbsolutePath :: AbsolutePath}
+  deriving (Show)
+
+mkFoundDocument :: AbsolutePath -> File -> FoundDocument
+mkFoundDocument libraryPath File {absolutePath, modificationTime} =
+  FoundDocument
+    { fdRelativePath = makeRelative libraryPath absolutePath,
+      fdAbsolutePath = absolutePath,
+      fdModificationTime = modificationTime
+    }
