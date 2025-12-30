@@ -97,7 +97,7 @@ parsePopulateOptions =
           )
       fileTargets =
         PopulateTargets
-          <$> some (strOption (long "file" <> short 'f' <> help "Parse and populate specific file(s)." <> metavar "FILE"))
+          <$> some (strOption (long "file" <> short 'f' <> help "Parse and update specific file(s)." <> metavar "FILE"))
    in allFilesSwitch <|> fileTargets
 
 parseDatabase :: Parser DatabaseArg

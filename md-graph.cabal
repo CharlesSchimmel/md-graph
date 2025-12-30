@@ -51,6 +51,7 @@ library
       MdGraph.Persist.Mapper
       MdGraph.Persist.Query
       MdGraph.Persist.Schema
+      MdGraph.Populate
       MdGraph.TagDirection
       MdGraph.Types
       MdGraph.Util
@@ -116,6 +117,7 @@ executable md-graph
       MdGraph.Persist.Mapper
       MdGraph.Persist.Query
       MdGraph.Persist.Schema
+      MdGraph.Populate
       MdGraph.TagDirection
       MdGraph.Types
       MdGraph.Util

@@ -70,8 +70,8 @@ insertDocuments :: [Document] -> Query (M.Map (Key Document) Document)
 insertDocuments docs = do
   keys <- insertMany docs
   let keyBatches = batch 500 keys
-  aoeu <- sequence (getMany <$> keyBatches)
-  return $ List.foldr M.union M.empty aoeu
+  insertedDocuments <- mapM getMany keyBatches
+  return $ List.foldr M.union M.empty insertedDocuments
 
 insertTempDocuments :: [TempDocument] -> Query [Key TempDocument]
 insertTempDocuments docs = do

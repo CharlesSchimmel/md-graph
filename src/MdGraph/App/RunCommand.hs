@@ -52,34 +52,38 @@ import MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema as Edge
   ( Edge (..),
   )
+import MdGraph.Populate
 import MdGraph.TagDirection
 import MdGraph.Util (trace'')
 import System.Directory (canonicalizePath)
 import System.FilePath (makeRelative, (</>))
 
 runCommand :: Command -> App [String]
-runCommand Orphans = fmap documentPath <$> runOrphans
-runCommand Unreachable = fmap documentPath <$> runUnreachable
-runCommand Nonexes = fmap edgeHead <$> runNonexistent
-runCommand (Subgraph options) = runSubgraph options
-runCommand (Backlinks options) = runBacklinks options
-runCommand Statics = throwError "NYI"
-runCommand (Populate _) = pure mempty
+runCommand c@(Populate _) = _runCommand c
+runCommand command = populate PopulateAll >> _runCommand command
+
+_runCommand :: Command -> App [String]
+_runCommand Orphans = fmap documentPath <$> runOrphans
+_runCommand Unreachable = fmap documentPath <$> runUnreachable
+_runCommand Nonexes = fmap edgeHead <$> runNonexistent
+_runCommand (Subgraph options) = runSubgraph options
+_runCommand (Backlinks options) = runBacklinks options
+_runCommand Statics = throwError "NYI"
+_runCommand (Populate options) = populate options >> return []
 
 runPopulate :: (Monad m, PreparesDb m, Queries m, Logs m, Files m, HasConfig m) => PopulateOptions -> m [String]
 runPopulate PopulateAll = pure mempty
 runPopulate (PopulateTargets targets) = do
   absoluteTargetPaths <- Monad.mapM trueAbsolutePath targets
 
-  Config {defaultExtension} <- getConfig
   foundDocuments <- findDocuments absoluteTargetPaths
   -- let unFoundDocuments = Get the documents that weren't found and delete them, if possible
 
   logDebug "Populating TempDocuments"
   _ <- insertTempDocuments $ Mapper.fromFile <$> foundDocuments
 
-  let targetPaths = Aux.Functor.for foundDocuments $ \File {relativePath} -> unRelativePath relativePath
-  deletedDocumentCount <- deleteDocuments targetPaths
+  let foundRelativePaths = Aux.Functor.for foundDocuments $ \File {relativePath} -> unRelativePath relativePath
+  deletedDocumentCount <- deleteDocuments foundRelativePaths
 
   logDebug "Pruning unchanged TempDocuments"
   unchangedCt <- pruneUnchangedTempDocuments

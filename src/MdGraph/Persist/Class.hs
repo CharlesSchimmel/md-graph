@@ -40,9 +40,17 @@ class PreparesDb m where
   insertDocuments :: [Document] -> m (M.Map (Key Document) Document)
   insertTempDocuments :: [TempDocument] -> m [Key TempDocument]
   getNewDocuments :: m [Entity TempDocument]
+
+  -- | Must be called after pruneDeletedDocuments! Delete TempDocs that have not been modified
   pruneUnchangedTempDocuments :: m Int64
+
   pruneDeletedDocuments :: m Int64
+
+  -- | Delete modified Documents (modified determined when the TempDoc
+  -- counterpart has a newer Modified) so that they can be found when newDocs is
+  -- run (we will have to delete them anyway)
   pruneModifiedDocuments :: m Int64
+
   deleteDocuments :: [FilePath] -> m Int64
 
 instance PreparesDb App where
