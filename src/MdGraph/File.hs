@@ -6,6 +6,7 @@ module MdGraph.File
     normaliseEvil,
     unrelativize,
     isAncestorOf,
+    MdGraph.File.makeRelative,
   )
 where
 
@@ -87,3 +88,6 @@ isAncestorOf (AbsolutePath parentPath) (AbsolutePath childPath) =
       zipped = zip parentDirs childDirs
       commonDirs = takeWhile (\(parentDir, childDir) -> parentDir == childDir) zipped
    in length parentDirs == length commonDirs
+
+makeRelative :: AbsolutePath -> AbsolutePath -> FilePath
+makeRelative (AbsolutePath source) (AbsolutePath dest) = System.FilePath.makeRelative source dest

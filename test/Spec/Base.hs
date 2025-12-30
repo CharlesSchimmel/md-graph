@@ -1,6 +1,5 @@
 module Spec.Base where
 
-import qualified Aux.Functor
 import qualified Constants
 import Control.Exception (evaluate)
 import qualified Control.Exception as E

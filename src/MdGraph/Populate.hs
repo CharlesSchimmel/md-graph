@@ -1,5 +1,6 @@
 module MdGraph.Populate (populate) where
 
+import Aux.Common (for)
 import Aux.Map as Map
 import Control.Applicative (Alternative (..), Applicative (..), (<$>))
 import qualified Control.Monad as Monad
@@ -26,29 +27,23 @@ import qualified MdGraph.Persist.Mapper as Mapper
 import MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema as Schema
 import System.FilePath
-  ( makeRelative,
-    (-<.>),
+  ( (-<.>),
     (<.>),
     (</>),
   )
 import Prelude as P
 
--- | Scan for Documents, parse them for Edges and Tags, and populate the database with changes.
-populate ::
-  (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m) =>
-  PopulateOptions ->
-  m ()
-populate PopulateAll = do
-  Config {libraryPath} <- getConfig
-  let libraryFilePath = unAbsolutePath libraryPath
-  populate $ PopulateTargets [libraryFilePath]
-populate (PopulateTargets targets) = do
-  -- TODO? Validate that the targets are in the Library?
-  absoluteTargetPaths <- Monad.mapM trueAbsolutePath targets
+type DeleteDocumentsFn m num = [File] -> m num
 
+_populate ::
+  (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m, Show num, Num num) =>
+  [AbsolutePath] ->
+  DeleteDocumentsFn m num ->
+  m ()
+_populate targets doPruneDeleted = do
   -- find documents
   logDebug "Finding documents"
-  foundDocuments <- findDocuments absoluteTargetPaths
+  foundDocuments <- findDocuments targets
   let totalCt = Foldable.length foundDocuments
   let relativeFileMap = Map.fromList' relativePath foundDocuments
 
@@ -56,11 +51,8 @@ populate (PopulateTargets targets) = do
   logDebug "Populating TempDocuments"
   insertTempDocuments $ Mapper.fromFile <$> foundDocuments
 
-  -- XXX: How to handle this in both populate cases? We do want to prune deleted documents when we do a full library scan.
-  -- It's easy in the targets case, we can check if any of the passed in targets doesn't exist.
-  -- If they use the individual target option, maybe we should skip the unchanged/modified steps?
   logDebug "Pruning deleted Documents"
-  deletedCt <- pruneDeletedDocuments
+  deletedCt <- doPruneDeleted foundDocuments
 
   logDebug "Pruning unchanged TempDocuments"
   unchangedCt <- pruneUnchangedTempDocuments
@@ -107,9 +99,39 @@ populate (PopulateTargets targets) = do
 
   return ()
 
+-- | Scan for Documents, parse them for Edges and Tags, and populate the database with changes.
+-- Would it make sense to return the found files?
+populate ::
+  (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m) =>
+  PopulateOptions ->
+  m ()
+populate PopulateAll = do
+  Config {libraryPath} <- getConfig
+  _populate [libraryPath] (const pruneDeletedDocuments)
+populate (PopulateTargets targets) = do
+  Config {libraryPath} <- getConfig
+  -- TODO? Validate that the targets are in the Library?
+  absoluteTargetPaths <- Monad.mapM trueAbsolutePath targets
+  let deleteDocumentsFn foundDocuments =
+        do
+          -- If any of the target files weren't found but were in the database, delete them.
+          -- This assumes that the target's aren't directories.
+          let foundPathsSet =
+                HashSet.fromList $
+                  for foundDocuments $
+                    \File {absolutePath = fileAbsPath} -> makeRelative libraryPath fileAbsPath
+          let targetPathsSet =
+                HashSet.fromList $
+                  for absoluteTargetPaths $
+                    \absTargetPath -> makeRelative libraryPath absTargetPath
+          let unfoundDocuments = Foldable.toList $ targetPathsSet `HashSet.difference` foundPathsSet
+          deleteDocuments unfoundDocuments
+
+  _populate absoluteTargetPaths deleteDocumentsFn
+
+reportDocumentCount :: (Monad m, Logs m, Show num, Num num) => num -> Text.Text -> m ()
 reportDocumentCount num reason = do
   logInfo . Text.unwords $ [Text.pack . show $ num, reason]
-  pure ()
 
 parseDocumentsAndOrganizeResults ::
   (Monad m, HasConfig m, Logs m, Files m, Parses m) =>
@@ -196,14 +218,15 @@ checkPathExists knownPaths path = do
 
 mkLinksRelativeToLibrary :: (Monad m, HasConfig m) => AbsoluteLink -> m RelativeLink
 mkLinksRelativeToLibrary (AbsoluteLink link@Link {linkPath, linkText}) = do
-  Config {libraryPath = AbsolutePath {unAbsolutePath = libraryPath}} <- getConfig
+  Config {libraryPath} <- getConfig
+  let absLinkPath = AbsolutePath linkPath -- kinda gross, but we already ensured it's an AbsoluteLink
   return . RelativeLink $
     Link
       { linkText = linkText,
         -- What if the linkPath isn't a descendent of the library? I don't
         -- think it matters, in that case it should be some other absolute
         -- path.
-        linkPath = makeRelative libraryPath linkPath
+        linkPath = makeRelative libraryPath absLinkPath
       }
 
 data PostParseCtx = PostParseCtx
