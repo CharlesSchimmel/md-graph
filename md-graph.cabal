@@ -189,6 +189,7 @@ test-suite md-graph-test
     , persistent
     , persistent-sqlite
     , persistent-template
+    , random
     , resourcet
     , text
     , time

@@ -1,10 +1,9 @@
 {-# HLINT ignore "Eta reduce" #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-import qualified Constants
+import Constants
 import Data.Either
 import Data.Function ((&))
 import qualified Data.Text.IO as Text
@@ -37,6 +36,7 @@ main = do
     FilesSpec.spec
     SubgraphSpec.spec libraryDir
     populateSpec
+    let Constants.TestFiles {..} = testFiles libraryDir
 
     let baseSgOptions =
           SubgraphOptions
