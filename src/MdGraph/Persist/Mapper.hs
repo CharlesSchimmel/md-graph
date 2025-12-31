@@ -21,7 +21,6 @@ class FromFile a where
 -- instance FromFile TempDocument where
 --   fromFile File.File {modificationTime} =
 --     TempDocument (File.unRelativePath relativePath) modificationTime
-
 class FromTempDocument a where
   fromTempDocument :: TempDocument -> a
 

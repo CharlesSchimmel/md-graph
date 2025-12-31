@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import GHC.IO.Handle (hIsWritable)
 import MdGraph.App.Arguments (DatabaseArg (DbFile))
 import MdGraph.File.Internal (trueAbsolutePathIO)
-import MdGraph.File.Types (AbsolutePath (..))
+import MdGraph.File.Types 
 import qualified System.Directory as D
 import System.IO
   ( IOMode

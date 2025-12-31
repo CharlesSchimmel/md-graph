@@ -5,6 +5,7 @@
 
 module MdGraph.App.RunCommand (runCommand) where
 
+import Aux.HashSet
 import Control.Applicative (Alternative ((<|>)), Applicative (liftA2))
 import Control.Exception (throwIO)
 import Control.Monad (join)
@@ -21,7 +22,6 @@ import qualified Data.List as L
 import qualified Data.List as List
 import Data.Maybe (catMaybes)
 import qualified Data.Text as T
-import qualified Data.Traversable as Traversable
 import Database.Persist (Entity (entityVal))
 import GHC.Generics (Generic)
 import GHC.IO.Encoding (getForeignEncoding)
@@ -45,11 +45,12 @@ import MdGraph.File
   )
 import MdGraph.File.Types (AbsolutePath (..), File (..), RelativePath (..))
 import MdGraph.Persist.Class (PreparesDb (..), Queries (..))
-import qualified MdGraph.Persist.Mapper as Mapper
+import MdGraph.Persist.Query as Q
 import MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema as Edge
   ( Edge (..),
   )
+import MdGraph.TagDirection
 import MdGraph.Util (trace'')
 import System.Directory (canonicalizePath)
 import System.FilePath (makeRelative, (</>))
