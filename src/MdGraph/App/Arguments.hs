@@ -6,7 +6,7 @@ module MdGraph.App.Arguments
   ( Arguments (..),
     DatabaseArg (..),
     cliArguments,
-    PopOpt (..),
+    ScanOptions (..),
   )
 where
 
@@ -35,7 +35,7 @@ data Arguments = Arguments
     argDatabase :: DatabaseArg,
     argLogLevel :: LogLevel,
     argCommand :: Command, -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
-    argPopulate :: PopOpt
+    argPopulate :: ScanOptions
   }
   deriving (Show)
 
@@ -86,47 +86,33 @@ parseCommand =
           )
         <> command
           "populate"
-          (info (Populate <$> parsePopulateOptions) $ progDesc "Just populate the database")
+          (info (pure Populate) $ progDesc "Don't perform any graph operations, just scan files and update them in the database.")
     )
 
-data PopOpt = PopAll | PopFile [FilePath] | PopNone
+data ScanOptions = ScanAll | ScanSome [FilePath] | ScanNone
   deriving (Show)
 
-popOptions2 :: Parser PopOpt
+popOptions2 :: Parser ScanOptions
 popOptions2 =
   let optNone =
         flag'
-          PopNone
+          ScanNone
           ( long "no-scan"
               <> help "Don't scan or update any documents, just use what's in the database."
           )
       optFile =
-        PopFile
+        ScanSome
           <$> some
             ( strOption
                 ( long "scan-file"
-                    <> help "Scan and update only the given files."
+                    <> help "Scan and update only the given files or directories."
                     <> short 'f'
                     <> metavar "FILE|DIR"
                 )
             )
-      -- optAll = flag' PopAll (long "scan-all" <> help "Scan, parse, and update all files in the given library directory. This is the default behavior.")
-      optAll = pure PopAll
+      -- optAll = flag' ScanAll (long "scan-all" <> help "Scan, parse, and update all files in the given library directory. This is the default behavior.")
+      optAll = pure ScanAll
    in (optNone <|> optFile <|> optAll)
-
-parsePopulateOptions :: Parser PopulateOptions
-parsePopulateOptions =
-  let allFilesSwitch =
-        flag'
-          PopulateAll
-          ( long "all"
-              <> short 'a'
-              <> help "Scan and populate all files in the library"
-          )
-      fileTargets =
-        PopulateTargets
-          <$> some (strOption (long "file" <> short 'f' <> help "Parse and update specific file(s)." <> metavar "FILE"))
-   in allFilesSwitch <|> fileTargets
 
 parseDatabase :: Parser DatabaseArg
 parseDatabase =

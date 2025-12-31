@@ -16,7 +16,7 @@ import Data.Time
 import Database.Persist.Sqlite
   ( Entity (entityVal),
   )
-import MdGraph.App.Command
+import MdGraph.App.Arguments
 import MdGraph.App.Logger
 import MdGraph.Config
 import MdGraph.File
@@ -32,8 +32,8 @@ import System.FilePath
     (<.>),
     (</>),
   )
-import Prelude as P
 
+-- Populating all files and populating some files need to handle deleting documents slightly differently, so we'll parameterize that operation. Everything else is the same.
 type DeleteDocumentsFn m num = [FoundDocument] -> m num
 
 _populate ::
@@ -114,12 +114,13 @@ _populate targets doPruneDeleted = do
 -- Would it make sense to return the found files?
 populate ::
   (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m) =>
-  PopulateOptions ->
+  ScanOptions ->
   m ()
-populate PopulateAll = do
+populate ScanNone = return ()
+populate ScanAll = do
   Config {libraryPath} <- getConfig
   _populate [libraryPath] (const pruneDeletedDocuments)
-populate (PopulateTargets targets) = do
+populate (ScanSome targets) = do
   Config {libraryPath} <- getConfig
   -- TODO? Validate that the targets are in the Library?
   absoluteTargetPaths <- Monad.mapM trueAbsolutePath targets

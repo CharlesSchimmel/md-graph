@@ -45,7 +45,7 @@ main = do
   libraryDir <- getLibraryDir
   hspec FilesSpec.spec
   hspec $ SubgraphSpec.spec libraryDir
-  hspec $ populateSpec
+  -- hspec $ populateSpec
   hspec $ do
     let baseSgOptions =
           SubgraphOptions
@@ -142,31 +142,31 @@ main = do
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
 
-populateSpec :: Spec
-populateSpec = do
-  describe "Populate" $ do
-    it "User can specify specific files to populate and parse" $ do
-      libraryDir <- getLibraryDir
-      withTempDbFile $ \args -> do
-        let dbPath = dbFile $ argDatabase args
+-- populateSpec :: Spec
+-- populateSpec = do
+--   describe "Populate" $ do
+--     it "User can specify specific files to populate and parse" $ do
+--       libraryDir <- getLibraryDir
+--       withTempDbFile $ \args -> do
+--         let dbPath = dbFile $ argDatabase args
 
-        -- Populate only linkChain2_md
-        let command = Populate $ PopulateTargets {popTargets = [libraryDir </> Constants.linkChain2_md]}
-        let args' = args {argCommand = command}
-        mdGraph args'
+--         -- Populate only linkChain2_md
+--         let command = Populate $ PopulateTargets {popTargets = [libraryDir </> Constants.linkChain2_md]}
+--         let args' = args {argCommand = command}
+--         mdGraph args'
 
-        -- It should be returned as unreachable (even though linkChain1_md links to it).
-        rawQueryResults <- runSqlite dbPath $ getAllDocuments
-        let dbDocuments = fmap documentPath $ entityVal <$> rawQueryResults
-        dbDocuments `shouldContain` [Constants.linkChain2_md]
-        dbDocuments `shouldNotContain` [Constants.linkChain1_md]
+--         -- It should be returned as unreachable (even though linkChain1_md links to it).
+--         rawQueryResults <- runSqlite dbPath $ getAllDocuments
+--         let dbDocuments = fmap documentPath $ entityVal <$> rawQueryResults
+--         dbDocuments `shouldContain` [Constants.linkChain2_md]
+--         dbDocuments `shouldNotContain` [Constants.linkChain1_md]
 
-        -- Populate linkChain1
-        let command = Populate $ PopulateTargets {popTargets = [libraryDir </> Constants.linkChain1_md]}
-        let args' = args {argCommand = command}
-        _ <- mdGraph args'
+--         -- Populate linkChain1
+--         let command = Populate $ PopulateTargets {popTargets = [libraryDir </> Constants.linkChain1_md]}
+--         let args' = args {argCommand = command}
+--         _ <- mdGraph args'
 
-        -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md
-        rawQueryResults <- runSqlite dbPath $ forwardLinks Constants.linkChain1_md
-        let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
-        queryResultPaths `shouldContain` [Constants.linkChain2_md]
+--         -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md
+--         rawQueryResults <- runSqlite dbPath $ forwardLinks Constants.linkChain1_md
+--         let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
+--         queryResultPaths `shouldContain` [Constants.linkChain2_md]

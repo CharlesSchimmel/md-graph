@@ -72,6 +72,7 @@ import MdGraph.Persist.Schema
     migrateMdGraph,
   )
 import qualified MdGraph.Persist.Schema as Schema
+import MdGraph.Populate
 import Options.Applicative
 import System.FilePath
   ( makeRelative,
@@ -82,7 +83,7 @@ import System.FilePath
 import Prelude as P
 
 mdGraph :: Arguments -> IO (Either T.Text [String])
-mdGraph args@Arguments {argCommand} = do
+mdGraph args@Arguments {argCommand, argPopulate} = do
   conf <- runExceptT $ argsToConfig args
   -- TODO: Better error handling here
   Monad.join <$> mapM withConf conf
@@ -97,6 +98,7 @@ mdGraph args@Arguments {argCommand} = do
     prepareDbAndRun :: Command -> App [String]
     prepareDbAndRun command = do
       prepareDatabase
+      populate argPopulate
       logDebug . T.pack $ show command
       runCommand command
 

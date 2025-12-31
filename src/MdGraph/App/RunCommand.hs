@@ -3,9 +3,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 
-module MdGraph.App.RunCommand where
+module MdGraph.App.RunCommand (runCommand) where
 
-import Aux.Common
 import Control.Applicative (Alternative ((<|>)), Applicative (liftA2))
 import Control.Exception (throwIO)
 import Control.Monad (join)
@@ -51,24 +50,19 @@ import MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema as Edge
   ( Edge (..),
   )
-import MdGraph.Populate
-import MdGraph.TagDirection
 import MdGraph.Util (trace'')
 import System.Directory (canonicalizePath)
 import System.FilePath (makeRelative, (</>))
 
 runCommand :: Command -> App [String]
-runCommand c@(Populate _) = _runCommand c
-runCommand command = populate PopulateAll >> _runCommand command
-
-_runCommand :: Command -> App [String]
-_runCommand Orphans = fmap documentPath <$> runOrphans
-_runCommand Unreachable = fmap documentPath <$> runUnreachable
-_runCommand Nonexes = fmap edgeHead <$> runNonexistent
-_runCommand (Subgraph options) = runSubgraph options
-_runCommand (Backlinks options) = runBacklinks options
-_runCommand Statics = throwError "NYI"
-_runCommand (Populate options) = populate options >> return []
+runCommand Orphans = fmap documentPath <$> runOrphans
+runCommand Unreachable = fmap documentPath <$> runUnreachable
+runCommand Nonexes = fmap edgeHead <$> runNonexistent
+runCommand (Subgraph options) = runSubgraph options
+runCommand (Backlinks options) = runBacklinks options
+runCommand Statics = throwError "NYI"
+-- Nothing to do. Population is handled in the MdGraph function
+runCommand Populate = return []
 
 runOrphans :: (Monad m, Queries m, Logs m) => m [Document]
 runOrphans = do
