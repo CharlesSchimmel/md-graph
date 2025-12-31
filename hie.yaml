@@ -3,11 +3,11 @@ cradle:
     - path: "./src"
       component: "md-graph:exe:md-graph"
 
-    - path: "./app/Main.hs"
+    - path: "./app"
       component: "md-graph:exe:md-graph"
 
     - path: "./app/Paths_md_graph.hs"
       component: "md-graph:exe:md-graph"
 
-    - path: "./test/Spec.hs"
+    - path: "./test"
       component: "md-graph:test:md-graph-test"
