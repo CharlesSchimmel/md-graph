@@ -1,46 +1,43 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# HLINT ignore "Eta reduce" #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Eta reduce" #-}
 import qualified Constants
-import Control.Exception (evaluate)
-import qualified Control.Exception as E
-import Control.Monad (unless)
-import Control.Monad.Except (runExceptT)
-import Control.Monad.Identity (Identity (runIdentity))
-import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
-import Data.Either (fromRight, isRight)
-import qualified Data.Text as T
-import Database.Persist.Sqlite (runSqlPersistM, wrapConnection)
-import Database.Sqlite (open)
+import Data.Either
+import Data.Function ((&))
+import qualified Data.Text.IO as Text
+import Database.Esqueleto.Experimental
+import Database.Persist.Sqlite (Entity (entityVal), runSqlite)
 import qualified FilesSpec
 import MdGraph (mdGraph)
-import qualified MdGraph
-import MdGraph.App (App (runApp), Env (Env))
-import MdGraph.App.Arguments (Arguments (..))
-import qualified MdGraph.App.Arguments as Arguments
-import MdGraph.App.Command (BacklinkOptions (..), Command (..), SubgraphOptions (..), SubgraphTarget (..), backlinksDefaultMaxDepth, backlinksDefaultMinDepth, subgraphDefaultMaxDepth, subgraphDefaultMinDepth)
-import qualified MdGraph.App.Command as Command
+import MdGraph.App.Arguments
+import MdGraph.App.Command as Command
 import qualified MdGraph.App.LogLevel as LogLevel
 import MdGraph.App.RunCommand (runCommand)
 import MdGraph.Config (Config (Config, libraryPath))
 import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
 import MdGraph.File.Types (AbsolutePath (..), File (..))
 import MdGraph.Node (Link (..))
+import MdGraph.Persist.Class (Queries (getForwardLinks))
+import MdGraph.Persist.Query (forwardLinks, getAllDocuments, orphansM, unreachableM)
+import MdGraph.Persist.Schema (Document (documentPath), EntityField (..))
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base
-import System.Directory (getCurrentDirectory)
+import qualified SubgraphSpec
+import System.Directory (getCurrentDirectory, getTemporaryDirectory, removeFile)
 import System.FilePath
 import Test.Hspec
-import Test.Hspec.Contrib.HUnit
-import Test.Hspec.QuickCheck
-import Prelude
 
 main :: IO ()
 main = do
   libraryDir <- getLibraryDir
-  hspec FilesSpec.spec
   hspec $ do
+    FilesSpec.spec
+    SubgraphSpec.spec libraryDir
+    populateSpec
+
     let baseSgOptions =
           SubgraphOptions
             { sgInclNonex = False,
@@ -50,104 +47,6 @@ main = do
               sgTargets = [],
               sgMinDepth = subgraphDefaultMinDepth
             }
-    describe "Backlinks" $ do
-      let baseBacklinkOptions =
-            BacklinkOptions
-              { blTargets = [],
-                blMaxDepth = backlinksDefaultMaxDepth,
-                blMinDepth = backlinksDefaultMinDepth
-              }
-
-      it "Correct backlinks are returned with default min depth" $ do
-        let command = Backlinks $ baseBacklinkOptions {blTargets = [FileTarget $ libraryDir </> Constants.linkChain4_md]}
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain3_md]
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain4_md]
-
-      it "Correct backlinks are returned with minDepth 0" $ do
-        let command = Backlinks $ baseBacklinkOptions {blTargets = [FileTarget $ libraryDir </> Constants.linkChain4_md], blMinDepth = 0}
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain3_md, Constants.linkChain4_md]
-
-      it "Min depth 2 is respected" $ do
-        let command =
-              Backlinks $ BacklinkOptions {blTargets = [FileTarget $ libraryDir </> Constants.linkChain4_md], blMinDepth = 2, blMaxDepth = -1}
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain3_md, Constants.linkChain4_md]
-        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md]
-
-    describe "Subgraph" $ do
-      it "Return the full subgraph of a file" $ do
-        let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md]}
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md, Constants.linkChain4_md]
-
-      it "Max depth is respected" $ do
-        let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md], sgMaxDepth = 3}
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md]
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain4_md]
-
-      it "Min depth 2 is respected" $ do
-        let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md], sgMinDepth = 2}
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain3_md, Constants.linkChain4_md]
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain1_md, Constants.linkChain2_md]
-
-      it "Min depth 1 is respected" $ do
-        let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md], sgMinDepth = 1}
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain2_md, Constants.linkChain3_md, Constants.linkChain4_md]
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain1_md]
-
-      it "Min depth 0 is respected" $ do
-        let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md], sgMinDepth = 0}
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md, Constants.linkChain4_md]
-
-      it "Nonexistent (broken) links are included if requested" $ do
-        let command =
-              Subgraph $
-                baseSgOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasNonExistentLink_md],
-                    sgInclNonex = True
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains ["link-to-nonexistent-file.md"]
-
-      it "Nonexistent (broken) links are _not_ included if not requested" $ do
-        let command =
-              Subgraph $
-                baseSgOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasNonExistentLink_md]
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputDoesNotContain ["link-to-nonexistent-file.md"]
-
-      it "Static files (ie files not recognized as documents) are included if requested" $ do
-        let command =
-              Subgraph $
-                baseSgOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasStaticFileLink_md],
-                    sgInclStatic = True
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.static_txt]
-
-      it "Static files (ie files not recognized as documents) are _not_ included if not requested" $ do
-        let command =
-              Subgraph $
-                baseSgOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.hasStaticFileLink_md]
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputDoesNotContain [Constants.static_txt]
-
     describe "Path handling" $ do
       it "Absolute paths are accepted and relativized to the library" $ do
         let command =
@@ -233,3 +132,33 @@ main = do
                   }
         let args = defaultSpecArgs {argCommand = command}
         mdGraph args >>= outputContains [Constants.parent_md]
+
+populateSpec :: Spec
+populateSpec = do
+  describe "Scan Options" $ do
+    it "User can specify specific files to scan" $ do
+      libraryDir <- getLibraryDir
+      withTempDbFile $ \args -> do
+        let dbPath = dbFile $ argDatabase args
+
+        -- Populate only linkChain2_md
+        let scanOpt = ScanSome [libraryDir </> Constants.linkChain2_md]
+        let args' = args {argCommand = Populate, argScan = scanOpt}
+        mdGraph args'
+
+        -- It should be the only document in the database, even though it has forward and backward links and there are more in the library
+        rawQueryResults <- runSqlite dbPath $ getAllDocuments
+        let dbDocuments = fmap documentPath $ entityVal <$> rawQueryResults
+        dbDocuments `shouldContain` [Constants.linkChain2_md]
+        dbDocuments `shouldNotContain` [Constants.linkChain1_md]
+
+        -- Populate linkChain1
+        let scanOpt = ScanSome [libraryDir </> Constants.linkChain1_md]
+        let args' = args {argCommand = Populate, argScan = scanOpt}
+        _ <- mdGraph args'
+
+        -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md, but no others.
+        rawQueryResults <- runSqlite dbPath $ forwardLinks Constants.linkChain1_md
+        let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
+        queryResultPaths `shouldContain` [Constants.linkChain2_md]
+        queryResultPaths `shouldNotContain` [Constants.linkChain3_md]

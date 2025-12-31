@@ -10,8 +10,7 @@
 
 module MdGraph.File.Internal where
 
-import Aux.Common (maybeTester)
-import qualified Aux.Functor as Functor
+import Aux.Common
 import Control.Applicative
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Monad as Monad
@@ -23,7 +22,7 @@ import Data.Hashable (Hashable)
 import qualified Data.List as List
 import Data.Maybe
 import Data.Time (UTCTime)
-import Data.Traversable as T
+import qualified Data.Traversable as Traversable
 import GHC.Generics (Generic)
 import MdGraph.File.Types
 import MdGraph.Util
@@ -49,9 +48,11 @@ maybeDirectory dir = maybeTester D.doesDirectoryExist dir
 -- | Find documents in library and return them with FilePaths relative to the
 -- library
 findDocuments ::
-  (Traversable f, Foldable f) => DefaultExtension -> f FilePath -> IO [File]
+  DefaultExtension -> [AbsolutePath] -> IO [File]
 findDocuments defaultExt sourcePaths = do
-  Monad.join . catMaybes . toList <$> T.mapM (traverseDir defaultExt) sourcePaths
+  maybeFiles <- Traversable.mapM (traverseDir defaultExt . unAbsolutePath) sourcePaths
+  let unmaybedFiles = catMaybes maybeFiles
+  return $ Monad.join unmaybedFiles
 
 data PathType = F FilePath | D FilePath deriving (Show)
 
@@ -69,10 +70,10 @@ getPathType path = do
 traverseDir :: FileExtension -> FilePath -> IO (Maybe [File])
 traverseDir extension basePath = do
   pathType <- getPathType basePath
-  maybeExpandResults <- T.sequence $ expand extension <$> pathType
-  let fileResults = Functor.for maybeExpandResults $
-        \expandResults -> Functor.for expandResults $
-          \expandResult -> expandResultToFile basePath expandResult
+  maybeExpandResults <- Traversable.sequence $ expand extension <$> pathType
+  let fileResults = for maybeExpandResults $
+        \expandResults -> for expandResults $
+          \expandResult -> expandResultToFile expandResult
   return fileResults
 
 -- | Recursively explore _path_, and return files with _extension_
@@ -92,8 +93,11 @@ expand extension (D path) = do
 -- or we could run into filepath collisions.
 
 -- | canonicalize path and also convert tilde home directory reference to actual
-trueAbsolutePathIO :: FilePath -> IO FilePath
-trueAbsolutePathIO path = detilde path >>= makeAbsolute
+trueAbsolutePathIO :: FilePath -> IO AbsolutePath
+trueAbsolutePathIO path = do
+  detilded <- detilde path
+  absolute <- makeAbsolute detilded
+  return $ AbsolutePath absolute
 
 -- TODO: shouldn't the shell expand this before passing it in?
 detilde :: FilePath -> IO FilePath
@@ -106,12 +110,10 @@ detilde path = do
     rejoin homePath ("~/" : pathParts) = joinPath (homePath : pathParts)
     rejoin _ pathParts = joinPath pathParts
 
-expandResultToFile :: FilePath -> ExpandResult -> File
-expandResultToFile basePath ExpandResult {resultPath, resultModTime} =
+expandResultToFile :: ExpandResult -> File
+expandResultToFile ExpandResult {resultPath, resultModTime} =
   let absResultPath = unAbsolutePath resultPath
-      relativePath = RelativePath $ makeRelative basePath absResultPath
    in File
         { absolutePath = resultPath,
-          relativePath = relativePath,
           modificationTime = resultModTime
         }

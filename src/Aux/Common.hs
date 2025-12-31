@@ -22,3 +22,7 @@ maybeTester :: (Monad m) => (a -> m Bool) -> a -> m (Maybe a)
 maybeTester tester a = do
   test <- tester a
   return $ if test then Just a else Nothing
+
+-- | `flip fmap`
+for :: (Functor f) => f a -> (a -> b) -> f b
+for = flip fmap

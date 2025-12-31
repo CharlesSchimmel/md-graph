@@ -6,6 +6,7 @@ module MdGraph.App.Arguments
   ( Arguments (..),
     DatabaseArg (..),
     cliArguments,
+    ScanOptions (..),
   )
 where
 
@@ -33,6 +34,7 @@ data Arguments = Arguments
     argDefExt :: FilePath,
     argDatabase :: DatabaseArg,
     argLogLevel :: LogLevel,
+    argScan :: ScanOptions,
     argCommand :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
   }
   deriving (Show)
@@ -52,7 +54,8 @@ parseArguments =
     <*> parseDefaultExt
     <*> parseDatabase
     <*> parseLogLevel
-    <*> parseCommand
+    <*> parseScanOptions
+    <*> parseCommand -- Again, see note above. This should stay last.
 
 parseCommand :: Parser Command
 parseCommand =
@@ -83,8 +86,33 @@ parseCommand =
           )
         <> command
           "populate"
-          (info (pure Populate) $ progDesc "Just populate the database")
+          (info (pure Populate) $ progDesc "Don't perform any graph operations, just scan files and update them in the database.")
     )
+
+data ScanOptions = ScanAll | ScanSome [FilePath] | ScanNone
+  deriving (Show)
+
+parseScanOptions :: Parser ScanOptions
+parseScanOptions =
+  let optNone =
+        flag'
+          ScanNone
+          ( long "no-scan"
+              <> help "Don't scan or update any documents, just use what's in the database."
+          )
+      optFile =
+        ScanSome
+          <$> some
+            ( strOption
+                ( long "scan-file"
+                    <> help "Scan and update only the given files or directories."
+                    <> short 'f'
+                    <> metavar "FILE|DIR"
+                )
+            )
+      -- optAll = flag' ScanAll (long "scan-all" <> help "Scan, parse, and update all files in the given library directory. This is the default behavior.")
+      optAll = pure ScanAll
+   in (optNone <|> optFile <|> optAll)
 
 parseDatabase :: Parser DatabaseArg
 parseDatabase =
@@ -103,8 +131,8 @@ parseLibrary =
   strOption
     ( long "library"
         <> short 'l'
-        <> help "Directory to search"
-        <> metavar "FILE|DIR"
+        <> help "The parent directory for all documents."
+        <> metavar "DIR"
         <> value "./"
         <> showDefault
     )

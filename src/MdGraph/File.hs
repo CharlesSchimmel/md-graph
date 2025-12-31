@@ -6,6 +6,7 @@ module MdGraph.File
     normaliseEvil,
     unrelativize,
     isAncestorOf,
+    MdGraph.File.makeRelative,
   )
 where
 
@@ -22,20 +23,26 @@ import qualified System.FilePath as FilePath
 
 class Files m where
   -- | Detilde and ensure the given path is absolute. Does not check for file existence.
-  trueAbsolutePath :: FilePath -> m FilePath
+  trueAbsolutePath :: FilePath -> m AbsolutePath
 
   -- | Check if a FilePath exists; Nothing if it doesn't, Just FilePath if it does.
   maybeFile :: FilePath -> m (Maybe FilePath)
 
+  -- | Find some documents
+  findDocuments :: [AbsolutePath] -> m [File]
+
   -- | Find all documents
-  findDocuments :: m [File]
+  findAllDocuments :: m [File]
 
 instance Files App where
   trueAbsolutePath = liftIO . Internal.trueAbsolutePathIO
   maybeFile = liftIO . Internal.maybeFile
 
-  -- Never used
-  findDocuments = do
+  findDocuments paths = do
+    Config {defaultExtension} <- getConfig
+    liftIO $ Internal.findDocuments defaultExtension paths
+
+  findAllDocuments = do
     config@Config {..} <- getConfig
     liftIO $ Internal.findDocuments defaultExtension [libraryPath]
 
@@ -81,3 +88,7 @@ isAncestorOf (AbsolutePath parentPath) (AbsolutePath childPath) =
       zipped = zip parentDirs childDirs
       commonDirs = takeWhile (\(parentDir, childDir) -> parentDir == childDir) zipped
    in length parentDirs == length commonDirs
+
+-- | System.FilePath.makeRelative, lifted to AbsolutePaths. Returns a FilePath (not a RelativePath) because it's not guaranteed to be Relative.
+makeRelative :: AbsolutePath -> AbsolutePath -> FilePath
+makeRelative (AbsolutePath source) (AbsolutePath dest) = System.FilePath.makeRelative source dest

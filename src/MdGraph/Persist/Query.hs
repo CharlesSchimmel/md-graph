@@ -18,6 +18,8 @@ module MdGraph.Persist.Query
     nonexistent,
     forwardLinks,
     backwardLinks,
+    deleteDocuments,
+    getAllDocuments,
   )
 where
 
@@ -33,8 +35,9 @@ import Data.Int (Int64)
 import qualified Data.List as List
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, fromMaybe, isJust)
+import Data.Monoid (All (getAll))
 import Data.Text (Text (..))
-import Data.Text as T
+import Data.Text as T hiding (count)
 import Database.Esqueleto.Experimental
 import Database.Esqueleto.Experimental.From.SqlSetOperation
   ( SqlSetOperation
@@ -59,6 +62,11 @@ import MdGraph.Config (Config (dbConnString))
 import MdGraph.Persist.Schema
 import UnliftIO.Resource (ResourceT (..))
 
+getAllDocuments :: Query [Entity Document]
+getAllDocuments = select $ do
+  doc <- from $ table @Document
+  return doc
+
 insertEdges :: [Edge] -> Query [Key Edge]
 insertEdges edges = insertMany edges
 
@@ -69,8 +77,8 @@ insertDocuments :: [Document] -> Query (M.Map (Key Document) Document)
 insertDocuments docs = do
   keys <- insertMany docs
   let keyBatches = batch 500 keys
-  aoeu <- sequence (getMany <$> keyBatches)
-  return $ List.foldr M.union M.empty aoeu
+  insertedDocuments <- mapM getMany keyBatches
+  return $ List.foldr M.union M.empty insertedDocuments
 
 insertTempDocuments :: [TempDocument] -> Query [Key TempDocument]
 insertTempDocuments docs = do
@@ -128,7 +136,7 @@ pruneUnchangedTempDocs = deleteCount $ do
         )
 
 -- | Must be called before pruneUnchangedTempDocs!
--- Delete Docmuments not found in most recent scan This should cascade to a
+-- Delete Docmuments not found TempDocuments. This should cascade to a
 -- document's Tags and Edges
 pruneDeletedDocuments :: Query Int64
 pruneDeletedDocuments = deleteCount $ do
@@ -145,6 +153,15 @@ whereDocumentDeleted file = do
             tf <- from $ table @TempDocument
             pure $ tf ^. TempDocumentPath
         )
+
+deleteDocuments ::
+  -- | Path relative to the library
+  [FilePath] ->
+  Query Int64
+deleteDocuments paths = deleteCount $ do
+  file <- from $ table @Document
+  where_ $
+    file ^. DocumentPath `in_` valList paths
 
 -- | Delete modified Documents (modified determined when the TempDoc
 -- counterpart has a newer Modified) so that they can be found when newDocs is
@@ -195,7 +212,7 @@ filesThatHaveLinks = do
           \(doc :& edge) -> doc ^. DocumentId ==. edge ^. EdgeTail
   pure file
 
--- | Files with no incoming edges (but may have outgoing
+-- | Files with no incoming edges (but may have outgoing)
 unreachableM :: Query [Entity Document]
 unreachableM =
   select

@@ -5,6 +5,7 @@ module MdGraph.App.Command where
 import Aux.HashSet
 import Data.HashSet as S
 import Data.List.NonEmpty
+import MdGraph.File.Types
 import MdGraph.TagDirection
 
 data Command

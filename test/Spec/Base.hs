@@ -1,36 +1,21 @@
 module Spec.Base where
 
-import qualified Aux.Functor
 import qualified Constants
-import Control.Exception (evaluate)
-import qualified Control.Exception as E
-import Control.Monad (unless)
+import Control.Exception.Base
 import qualified Control.Monad as Monad
 import qualified Control.Monad as Traversable
-import Control.Monad.Except (runExceptT)
-import Control.Monad.Reader (ReaderT (runReaderT))
-import Data.Either (fromRight, isRight)
+import Data.Either as Either
 import qualified Data.List as List
-import qualified Data.Text as T
-import Database.Persist.Sqlite (runSqlPersistM, wrapConnection)
-import Database.Sqlite (open)
-import MdGraph (mdGraph)
-import MdGraph.App (App (runApp), Env (Env))
-import MdGraph.App.Arguments (Arguments (..))
-import qualified MdGraph.App.Arguments as Arguments
-import MdGraph.App.Command (BacklinkOptions (..), Command (..), SubgraphOptions (..), SubgraphTarget (..))
+import Data.Text as Text
+import Data.Text.IO as Text
+import MdGraph.App.Arguments
 import qualified MdGraph.App.Command as Command
 import qualified MdGraph.App.LogLevel as LogLevel
-import MdGraph.App.RunCommand (runCommand)
-import MdGraph.Config (Config (Config, libraryPath))
-import MdGraph.File.Internal
 import qualified MdGraph.TagDirection as TagDirection
-import System.Directory (getCurrentDirectory)
+import System.Directory
 import System.FilePath
+import qualified System.IO
 import Test.Hspec
-import Test.Hspec.Contrib.HUnit
-import Test.Hspec.QuickCheck
-import Prelude
 
 getLibraryDir :: IO FilePath
 getLibraryDir = do
@@ -42,9 +27,10 @@ defaultSpecArgs =
   Arguments
     { argLibrary = "./test/library",
       argDefExt = "md",
-      argDatabase = Arguments.DbFile ":memory:",
+      argDatabase = DbFile ":memory:",
       argLogLevel = LogLevel.None,
-      argCommand = Command.Populate
+      argCommand = Command.Populate,
+      argScan = ScanAll
     }
 
 shouldReturnFrom :: (HasCallStack, Show a, Eq a) => a -> IO a -> Expectation
@@ -63,3 +49,25 @@ outputDoesNotContain rejectedValues eitherList = do
   either failIfLeft shouldNotContainAnyRejectedValues eitherList
   where
     shouldNotContainAnyRejectedValues actualValues = Monad.forM_ rejectedValues $ \value -> actualValues `shouldNotContain` [value]
+
+withTempDbFile :: (Arguments -> IO a) -> IO a
+withTempDbFile fn = do
+  tempDir <- getTemporaryDirectory
+  let acquire =
+        do
+          (path, handle) <- System.IO.openTempFileWithDefaultPermissions tempDir "mdgraph.db"
+          Text.putStrLn . Text.unwords $ ["Using temp db file", Text.pack path]
+          System.IO.hClose handle -- we don't actually need the handle, we Just want the path
+          return path
+  let run tempDbPath =
+        let argsWithTempDb = defaultSpecArgs {argDatabase = DbFile . Text.pack $ tempDbPath}
+         in fn argsWithTempDb
+  let release tempDbPath =
+        do
+          System.Directory.removeFile tempDbPath
+          return ()
+
+  bracket
+    acquire
+    release
+    run

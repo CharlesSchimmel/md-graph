@@ -72,6 +72,7 @@ import MdGraph.Persist.Schema
     migrateMdGraph,
   )
 import qualified MdGraph.Persist.Schema as Schema
+import MdGraph.Populate
 import Options.Applicative
 import System.FilePath
   ( makeRelative,
@@ -82,7 +83,7 @@ import System.FilePath
 import Prelude as P
 
 mdGraph :: Arguments -> IO (Either T.Text [String])
-mdGraph args@Arguments {argCommand} = do
+mdGraph args@Arguments {argCommand, argScan} = do
   conf <- runExceptT $ argsToConfig args
   -- TODO: Better error handling here
   Monad.join <$> mapM withConf conf
@@ -97,6 +98,7 @@ mdGraph args@Arguments {argCommand} = do
     prepareDbAndRun :: Command -> App [String]
     prepareDbAndRun command = do
       prepareDatabase
+      populate argScan
       logDebug . T.pack $ show command
       runCommand command
 
@@ -104,171 +106,7 @@ prepareDatabase ::
   (Monad m, HasConfig m, PreparesDb m, Logs m, Files m, Parses m) => m ()
 prepareDatabase = do
   Config {defaultExtension, libraryPath, dbConnString} <- getConfig
-  logDebug $ T.unwords ["Using library:", T.pack libraryPath]
+  logDebug $ T.unwords ["Using library:", T.pack $ unAbsolutePath libraryPath]
   logDebug $ T.unwords ["Preparing database:", dbConnString]
   migrate
-
-  -- find documents
-  logDebug "Finding documents"
-  foundDocuments <- findDocuments
-  let totalCt = P.length foundDocuments
-  let relativeFileMap = M.fromList' relativePath foundDocuments
-
-  -- load all found documents into temp
-  logDebug "Populating TempDocuments"
-  insertTempDocuments $ Mapper.fromFile <$> foundDocuments
-
-  logDebug "Pruning deleted Documents"
-  deletedCt <- pruneDeletedDocuments
-
-  logDebug "Pruning unchanged TempDocuments"
-  unchangedCt <- pruneUnchangedTempDocuments
-
-  logDebug "Pruning modified Documents"
-  modifiedCt <- pruneModifiedDocuments
-
-  logDebug "Finding new and modified TempDocuments"
-  newTempDocs <- getNewDocuments
-  let docsToInsert = Mapper.fromTempDocument . entityVal <$> newTempDocs
-      newCt = P.length docsToInsert - fromIntegral modifiedCt
-
-  reportDocumentCount totalCt "total documents"
-  reportDocumentCount unchangedCt "unchanged"
-  reportDocumentCount deletedCt "deleted"
-  reportDocumentCount modifiedCt "modified"
-  reportDocumentCount newCt "new"
-
-  logDebug "Inserting new and modified Documents"
-  newDocs <- insertDocuments docsToInsert
-
-  let docKeyMap = M.flop (RelativePath . documentPath) newDocs
-
-  logDebug "Parsing new and modified Documents"
-  logDebug . T.pack . show $ M.keys docKeyMap
-
-  let filesAndDocumentToParse = M.elems $ M.unionZip relativeFileMap docKeyMap
-
-  (newEdges, newTags) <- parseDocumentsAndOrganizeResults filesAndDocumentToParse
-
-  logInfo
-    . T.unwords
-    $ ["Found", T.pack . show . P.length $ newEdges, "new edges"]
-
-  logDebug . T.pack . show $ newEdges
-  logDebug "Inserting new edges"
-  insertEdges newEdges
-
-  logInfo
-    . T.unwords
-    $ ["Found", T.pack . show . P.length $ newTags, "new tags"]
-  logDebug "Inserting new tags"
-  insertTags newTags
-
-  pure ()
-
-reportDocumentCount num reason = do
-  logInfo . T.unwords $ [T.pack . show $ num, reason]
-  pure ()
-
-parseDocumentsAndOrganizeResults ::
-  (Monad m, HasConfig m, Logs m, Files m, Parses m) =>
-  [(File, Key Document)] ->
-  m ([Edge], [Schema.Tag])
-parseDocumentsAndOrganizeResults filesAndDocumentToParse = do
-  parseErrorOrContext <- Monad.forM filesAndDocumentToParse $ \(file, document) -> do
-    parseErrorOrResult <- parseDocument . absolutePath $ file
-    return $ do
-      -- Either Monad
-      ParseResult {tags, links} <- parseErrorOrResult
-      Right $
-        PostParseCtx
-          { ppcDocument = document,
-            ppcFile = file,
-            ppcTag = tags,
-            ppcLinks = links
-          }
-
-  let (parseErrors, postParseCtxs) = Either.partitionEithers parseErrorOrContext
-
-  Monad.when (Foldable.length parseErrors > 0) $ do
-    logError "Failed to parse some files" -- TODO add more detail
-  let documentsAndAbsoluteLinks = postParseCtxs >>= unrollUnrelativizeLinks
-
-  let knownFilePaths = HashSet.fromList $ map (\(File {absolutePath}, _) -> unAbsolutePath absolutePath) filesAndDocumentToParse
-  documentAndRelativeLinksWithExtensions <- Monad.forM documentsAndAbsoluteLinks $ \(doc, link) -> do
-    linkWithExtension <- addExtensionIfFileExists knownFilePaths link
-    relativeLink <- mkLinksRelativeToLibrary linkWithExtension
-    return (doc, relativeLink)
-
-  let newEdges = uncurry Mapper.toEdge <$> documentAndRelativeLinksWithExtensions
-
-  let newTags =
-        postParseCtxs
-          >>= ( \PostParseCtx {ppcTag, ppcDocument} ->
-                  Mapper.toTag ppcDocument <$> ppcTag
-              )
-  return $ (newEdges, newTags)
-
-unrollUnrelativizeLinks :: PostParseCtx -> [(Key Document, AbsoluteLink)]
-unrollUnrelativizeLinks PostParseCtx {ppcFile, ppcDocument, ppcLinks} = do
-  link <- ppcLinks
-  let (File {absolutePath = sourcePath}) = ppcFile
-  [(ppcDocument, unrelativizeLink sourcePath link)]
-
--- | Use a Link's source file path to unrelativize the Link path.
-unrelativizeLink :: AbsolutePath -> Link -> AbsoluteLink
-unrelativizeLink path link@(Link {linkPath}) = AbsoluteLink $ link {linkPath = unrelativizedPath}
-  where
-    unrelativizedPath = unAbsolutePath $ unrelativize path linkPath
-
--- | Links don't necessarily have or need a file extension. Check if a link's
--- path exists when we append the default extension. If it does, use that
--- instead.
-addExtensionIfFileExists ::
-  (Monad m, Files m, HasConfig m) =>
-  HashSet FilePath ->
-  AbsoluteLink ->
-  m AbsoluteLink
-addExtensionIfFileExists knownFiles (AbsoluteLink link@(Link {linkPath})) = do
-  Config {defaultExtension} <- getConfig
-
-  pathExistsUnmodified <- checkPathExists knownFiles linkPath
-
-  let pathWithExtension = linkPath -<.> defaultExtension
-  pathExistsWithExtension <- checkPathExists knownFiles pathWithExtension
-
-  let pathExists = pathExistsUnmodified <|> pathExistsWithExtension
-  let checkedLink =
-        maybe link (\checkedPath -> link {linkPath = checkedPath}) pathExists
-  return . AbsoluteLink $ checkedLink
-
-checkPathExists ::
-  (Monad m, Files m) =>
-  HashSet FilePath ->
-  FilePath ->
-  m (Maybe FilePath)
-checkPathExists knownPaths path = do
-  let pathAlreadyDiscovered = if S.member path knownPaths then Just path else Nothing
-
-  pathExistsOnFilesystem <- maybeFile path
-  return $ pathAlreadyDiscovered <|> pathExistsOnFilesystem
-
-mkLinksRelativeToLibrary :: (Monad m, HasConfig m) => AbsoluteLink -> m RelativeLink
-mkLinksRelativeToLibrary (AbsoluteLink link@Link {linkPath, linkText}) = do
-  Config {libraryPath} <- getConfig
-  return . RelativeLink $
-    Link
-      { linkText = linkText,
-        -- What if the linkPath isn't a descendent of the library? I don't
-        -- think it matters, in that case it should be some other absolute
-        -- path.
-        linkPath = makeRelative libraryPath linkPath
-      }
-
-data PostParseCtx = PostParseCtx
-  { ppcFile :: File,
-    ppcDocument :: Key Document,
-    ppcLinks :: [Link],
-    ppcTag :: [Tag]
-  }
-  deriving (Show)
+  return ()

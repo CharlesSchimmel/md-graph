@@ -3,7 +3,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 
-module MdGraph.App.RunCommand where
+module MdGraph.App.RunCommand (runCommand) where
 
 import Aux.HashSet
 import Control.Applicative (Alternative ((<|>)), Applicative (liftA2))
@@ -40,10 +40,11 @@ import MdGraph.Config
     HasConfig (getConfig),
   )
 import MdGraph.File
-  ( Files (maybeFile),
+  ( Files (findDocuments, maybeFile),
     trueAbsolutePath,
   )
-import MdGraph.Persist.Class (Queries (..))
+import MdGraph.File.Types (AbsolutePath (..), File (..), RelativePath (..))
+import MdGraph.Persist.Class (PreparesDb (..), Queries (..))
 import MdGraph.Persist.Query as Q
 import MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema as Edge
@@ -61,7 +62,8 @@ runCommand Nonexes = fmap edgeHead <$> runNonexistent
 runCommand (Subgraph options) = runSubgraph options
 runCommand (Backlinks options) = runBacklinks options
 runCommand Statics = throwError "NYI"
-runCommand Populate = pure mempty
+-- Nothing to do. Population is handled in the MdGraph function
+runCommand Populate = return []
 
 runOrphans :: (Monad m, Queries m, Logs m) => m [Document]
 runOrphans = do
@@ -129,7 +131,7 @@ runSubgraph options@SubgraphOptions {sgTargets, sgMinDepth, sgMaxDepth, sgInclNo
     processResults results SubgraphOptions {sgInclNonex = True, sgInclStatic = True} = return results
     processResults results SubgraphOptions {sgInclNonex = False, sgInclStatic = False} = return $ List.filter isDocument results
     processResults results SubgraphOptions {sgInclNonex = False, sgInclStatic = True} = do
-      Config {libraryPath} <- getConfig
+      Config {libraryPath = AbsolutePath {unAbsolutePath = libraryPath}} <- getConfig
       tryResolveEdgePaths <- Monad.forM results $ \case
         doc@(SgDocument docPath) -> return $ Just doc
         edge@(SgEdge edgePath) -> do
@@ -140,7 +142,7 @@ runSubgraph options@SubgraphOptions {sgTargets, sgMinDepth, sgMaxDepth, sgInclNo
           return $ (edge <$ (plainPath <|> libraryEdgePath))
       return $ catMaybes tryResolveEdgePaths
     processResults results SubgraphOptions {sgInclNonex = True, sgInclStatic = False} = do
-      Config {libraryPath} <- getConfig
+      Config {libraryPath = AbsolutePath {unAbsolutePath = libraryPath}} <- getConfig
       tryResolveEdgePaths <- Monad.forM results $ \case
         doc@(SgDocument docPath) -> return $ Just doc
         edge@(SgEdge edgePath) -> do
@@ -167,8 +169,8 @@ runSubgraphOnArg ::
   SubgraphTarget ->
   m (HashSet SgResult)
 runSubgraphOnArg linkGetter minDepth maxDepth foundPaths (FileTarget path) = do
-  libPath <- libraryPath <$> getConfig
-  targetAbsolutePath <- trueAbsolutePath path
+  AbsolutePath {unAbsolutePath = libPath} <- libraryPath <$> getConfig
+  AbsolutePath {unAbsolutePath = targetAbsolutePath} <- trueAbsolutePath path
   -- Making this an SgDocument feels a little dirty because that implies we know it exists...
   let relPath = SgDocument $ makeRelative libPath targetAbsolutePath
 
