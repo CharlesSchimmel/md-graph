@@ -83,7 +83,7 @@ import System.FilePath
 import Prelude as P
 
 mdGraph :: Arguments -> IO (Either T.Text [String])
-mdGraph args@Arguments {argCommand, argPopulate} = do
+mdGraph args@Arguments {argCommand, argScan} = do
   conf <- runExceptT $ argsToConfig args
   -- TODO: Better error handling here
   Monad.join <$> mapM withConf conf
@@ -98,7 +98,7 @@ mdGraph args@Arguments {argCommand, argPopulate} = do
     prepareDbAndRun :: Command -> App [String]
     prepareDbAndRun command = do
       prepareDatabase
-      populate argPopulate
+      populate argScan
       logDebug . T.pack $ show command
       runCommand command
 

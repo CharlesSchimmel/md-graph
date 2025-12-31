@@ -34,7 +34,7 @@ data Arguments = Arguments
     argDefExt :: FilePath,
     argDatabase :: DatabaseArg,
     argLogLevel :: LogLevel,
-    argPopulate :: ScanOptions,
+    argScan :: ScanOptions,
     argCommand :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
   }
   deriving (Show)

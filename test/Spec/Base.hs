@@ -30,7 +30,7 @@ defaultSpecArgs =
       argDatabase = DbFile ":memory:",
       argLogLevel = LogLevel.None,
       argCommand = Command.Populate,
-      argPopulate = ScanAll
+      argScan = ScanAll
     }
 
 shouldReturnFrom :: (HasCallStack, Show a, Eq a) => a -> IO a -> Expectation

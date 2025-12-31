@@ -4,16 +4,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-import Aux.Common
-import Constants (linkChain1_md)
 import qualified Constants
-import Control.Exception
-import Control.Monad
 import Data.Either
 import Data.Function ((&))
-import Data.Text as Text
 import qualified Data.Text.IO as Text
-import Database.Esqueleto (Value (unValue))
 import Database.Esqueleto.Experimental
 import Database.Persist.Sqlite (Entity (entityVal), runSqlite)
 import qualified FilesSpec
@@ -34,11 +28,7 @@ import Spec.Base
 import qualified SubgraphSpec
 import System.Directory (getCurrentDirectory, getTemporaryDirectory, removeFile)
 import System.FilePath
-import System.IO
 import Test.Hspec
-import Test.Hspec.Contrib.HUnit
-import Test.Hspec.QuickCheck
-import Prelude
 
 main :: IO ()
 main = do
@@ -151,8 +141,8 @@ main = do
 --         let dbPath = dbFile $ argDatabase args
 
 --         -- Populate only linkChain2_md
---         let command = Populate $ PopulateTargets {popTargets = [libraryDir </> Constants.linkChain2_md]}
---         let args' = args {argCommand = command}
+--         let scanOpt = ScanSome [libraryDir </> Constants.linkChain2_md]
+--         let args' = args {argCommand = Populate}
 --         mdGraph args'
 
 --         -- It should be returned as unreachable (even though linkChain1_md links to it).
@@ -162,8 +152,8 @@ main = do
 --         dbDocuments `shouldNotContain` [Constants.linkChain1_md]
 
 --         -- Populate linkChain1
---         let command = Populate $ PopulateTargets {popTargets = [libraryDir </> Constants.linkChain1_md]}
---         let args' = args {argCommand = command}
+--         let scanOpt = ScanSome [libraryDir </> Constants.linkChain1_md]
+--         let args' = args {argCommand = Populate, argScan}
 --         _ <- mdGraph args'
 
 --         -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md
