@@ -135,8 +135,8 @@ main = do
 
 populateSpec :: Spec
 populateSpec = do
-  describe "Populate" $ do
-    it "User can specify specific files to populate and parse" $ do
+  describe "Scan Options" $ do
+    it "User can specify specific files to scan" $ do
       libraryDir <- getLibraryDir
       withTempDbFile $ \args -> do
         let dbPath = dbFile $ argDatabase args
@@ -146,7 +146,7 @@ populateSpec = do
         let args' = args {argCommand = Populate, argScan = scanOpt}
         mdGraph args'
 
-        -- It should be returned as unreachable (even though linkChain1_md links to it).
+        -- It should be the only document in the database, even though it has forward and backward links and there are more in the library
         rawQueryResults <- runSqlite dbPath $ getAllDocuments
         let dbDocuments = fmap documentPath $ entityVal <$> rawQueryResults
         dbDocuments `shouldContain` [Constants.linkChain2_md]
@@ -157,7 +157,8 @@ populateSpec = do
         let args' = args {argCommand = Populate, argScan = scanOpt}
         _ <- mdGraph args'
 
-        -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md
+        -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md, but no others.
         rawQueryResults <- runSqlite dbPath $ forwardLinks Constants.linkChain1_md
         let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
         queryResultPaths `shouldContain` [Constants.linkChain2_md]
+        queryResultPaths `shouldNotContain` [Constants.linkChain3_md]

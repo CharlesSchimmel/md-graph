@@ -64,7 +64,7 @@ withTempDbFile fn = do
          in fn argsWithTempDb
   let release tempDbPath =
         do
-          -- System.Directory.removeFile tempDbPath
+          System.Directory.removeFile tempDbPath
           return ()
 
   bracket
