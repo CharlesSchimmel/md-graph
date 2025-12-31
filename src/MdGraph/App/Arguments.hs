@@ -34,7 +34,8 @@ data Arguments = Arguments
     argDefExt :: FilePath,
     argDatabase :: DatabaseArg,
     argLogLevel :: LogLevel,
-    argCommand :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
+    argCommand :: Command, -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
+    argPopulate :: PopOpt
   }
   deriving (Show)
 
@@ -54,6 +55,7 @@ parseArguments =
     <*> parseDatabase
     <*> parseLogLevel
     <*> parseCommand
+    <*> popOptions2
 
 parseCommand :: Parser Command
 parseCommand =
@@ -92,10 +94,25 @@ data PopOpt = PopAll | PopFile [FilePath] | PopNone
 
 popOptions2 :: Parser PopOpt
 popOptions2 =
-  let optAll = flag' PopAll (long "pall" <> help "Populate all")
-      optNone = flag' PopNone (long "pnone" <> help "Populate all")
-      optFile = PopFile <$> some (strOption (long "pfile" <> help "Populate file"))
-   in (optAll <|> optNone <|> optFile)
+  let optNone =
+        flag'
+          PopNone
+          ( long "no-scan"
+              <> help "Don't scan or update any documents, just use what's in the database."
+          )
+      optFile =
+        PopFile
+          <$> some
+            ( strOption
+                ( long "scan-file"
+                    <> help "Scan and update only the given files."
+                    <> short 'f'
+                    <> metavar "FILE|DIR"
+                )
+            )
+      -- optAll = flag' PopAll (long "scan-all" <> help "Scan, parse, and update all files in the given library directory. This is the default behavior.")
+      optAll = pure PopAll
+   in (optNone <|> optFile <|> optAll)
 
 parsePopulateOptions :: Parser PopulateOptions
 parsePopulateOptions =
@@ -128,8 +145,8 @@ parseLibrary =
   strOption
     ( long "library"
         <> short 'l'
-        <> help "Directory to search"
-        <> metavar "FILE|DIR"
+        <> help "The parent directory for all documents."
+        <> metavar "DIR"
         <> value "./"
         <> showDefault
     )
