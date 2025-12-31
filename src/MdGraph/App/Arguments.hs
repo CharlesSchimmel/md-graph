@@ -34,8 +34,8 @@ data Arguments = Arguments
     argDefExt :: FilePath,
     argDatabase :: DatabaseArg,
     argLogLevel :: LogLevel,
-    argCommand :: Command, -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
-    argPopulate :: ScanOptions
+    argPopulate :: ScanOptions,
+    argCommand :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
   }
   deriving (Show)
 
@@ -54,8 +54,8 @@ parseArguments =
     <*> parseDefaultExt
     <*> parseDatabase
     <*> parseLogLevel
-    <*> parseCommand
-    <*> popOptions2
+    <*> parseScanOptions
+    <*> parseCommand -- Again, see note above. This should stay last.
 
 parseCommand :: Parser Command
 parseCommand =
@@ -92,8 +92,8 @@ parseCommand =
 data ScanOptions = ScanAll | ScanSome [FilePath] | ScanNone
   deriving (Show)
 
-popOptions2 :: Parser ScanOptions
-popOptions2 =
+parseScanOptions :: Parser ScanOptions
+parseScanOptions =
   let optNone =
         flag'
           ScanNone
