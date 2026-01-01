@@ -7,6 +7,7 @@
 import Constants
 import Data.Either
 import Data.Function ((&))
+import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import Database.Esqueleto.Experimental
 import Database.Persist.Sqlite (Entity (entityVal), runSqlite)
@@ -32,22 +33,12 @@ import Test.Hspec
 
 main :: IO ()
 main = do
-  libraryDir <- getLibraryDir
   hspec $ do
     FilesSpec.spec
-    SubgraphSpec.spec libraryDir
+    SubgraphSpec.spec
     populateSpec
     -- let Constants.TestFiles {..} = testFiles libraryDir
 
-    let baseSgOptions =
-          SubgraphOptions
-            { sgInclNonex = False,
-              sgInclStatic = False,
-              sgTagDir = TagDirection.In,
-              sgMaxDepth = subgraphDefaultMaxDepth,
-              sgTargets = [],
-              sgMinDepth = subgraphDefaultMinDepth
-            }
     specSetup $
       describe "Path handling" $ do
         it "Absolute paths are accepted and relativized to the library" $
@@ -66,88 +57,69 @@ main = do
             let command =
                   Subgraph $
                     baseSgOptions
-                      { sgTargets = [FileTarget $ testFiles._linkChain1_md]
+                      { sgTargets = [FileTarget $ takeFileName testFiles._linkChain1_md]
                       }
             let args = defaultArgs {argCommand = command}
             mdGraph args >>= outputContains [takeFileName testFiles._linkChain1_md]
 
         it "Relative directory traversals are resolved and simplified" $
-          \SpecConfig {..} -> do
+          \config -> do
+            let usesDirectoryTraversal = "subdir/uses-directory-traversal.md"
+            config.createDoc usesDirectoryTraversal "[parent](../parent.md)"
             let command =
                   Subgraph $
                     baseSgOptions
-                      { sgTargets = [FileTarget $ testFiles._usesDirectoryTraversal_md]
+                      { sgTargets = [FileTarget $ usesDirectoryTraversal]
                       }
-            let args = defaultArgs {argCommand = command}
-            mdGraph args >>= outputContains [takeFileName testFiles._parent_md]
+            let args = config.defaultArgs {argCommand = command}
+            mdGraph args >>= outputContains [usesDirectoryTraversal]
 
         it "Convoluted directory traversals are resolved and simplified" $
-          \SpecConfig {..} -> do
+          \config -> do
+            let usesConvolutedDirectoryTraversal = "subdir/uses-convoluted-directory-traversal.md"
+            config.createDoc usesConvolutedDirectoryTraversal "[Convoluted relative directory traversal](../subdir/../parent.md)"
             let command =
                   Subgraph $
                     baseSgOptions
-                      { sgTargets = [FileTarget $ testFiles._usesConvolutedDirectoryTraversal_md]
+                      { sgTargets = [FileTarget $ usesConvolutedDirectoryTraversal]
                       }
-            let args = defaultArgs {argCommand = command}
-            mdGraph args >>= outputContains [takeFileName testFiles._parent_md]
+            let args = config.defaultArgs {argCommand = command}
+            mdGraph args >>= outputContains [usesConvolutedDirectoryTraversal]
 
     specSetup $
       describe "Orphans" $ do
-        it "Files with no links to or from them are identified" $
-          \SpecConfig {..} -> do
-            let args = defaultArgs {argCommand = Command.Orphans}
-            mdGraph args >>= outputContains [Constants.orphan_md]
+        it "Files with no links to or from them are identified as orphans" $
+          \config -> do
+            let orphanFile = "orphan.md"
+            config.createDoc orphanFile "annie or oliver"
+            let args = config.defaultArgs {argCommand = Command.Orphans}
+            mdGraph args >>= outputContains [orphanFile]
 
         it "Orphan files are not identified as unreachable" $
-          \SpecConfig {..} -> do
-            let args = defaultArgs {argCommand = Command.Unreachable}
-            mdGraph args >>= outputDoesNotContain [Constants.orphan_md]
+          \config -> do
+            let orphanFile = "orphan.md"
+            config.createDoc orphanFile "annie or oliver"
+            let args = config.defaultArgs {argCommand = Command.Unreachable}
+            mdGraph args >>= outputDoesNotContain [orphanFile]
 
     specSetup $
       describe "Unreachable" $ do
-        it "Files that have links but have no links to them are identified" $
+        it "Files that have links but have no links to them are identified as unreachable" $
           \config -> do
+            let unreachable = "unreachable.md"
+            config.createDoc unreachable "[parent](./parent.md)"
             let args = config.defaultArgs {argCommand = Command.Unreachable}
-            mdGraph args >>= outputContains [Constants.unreachable_md]
+            mdGraph args >>= outputContains [unreachable]
 
     specSetup $
       describe "Nonexistent" $ do
         it "Nonexistent returns links that do not resolve to a file" $
           \config -> do
+            let unreachable = "nonexistent.md"
+            let doesNotExist = "does not exist.md"
+            config.createDoc unreachable . Text.pack $ "[this link does not exist](./" ++ doesNotExist ++ ")"
             let args = config.defaultArgs {argCommand = Command.Nonexes}
-            mdGraph args >>= outputContains ["link-to-nonexistent-file.md"]
-
-    specSetup $
-      describe "Parsing" $ do
-        it "File extensions in links may be omitted and the default is used instead" $
-          \config -> do
-            let command =
-                  Subgraph $
-                    SubgraphOptions
-                      { sgTargets = [FileTarget $ config.testFiles._linksDontHaveExtensions_md],
-                        sgInclNonex = True,
-                        sgInclStatic = True,
-                        sgTagDir = TagDirection.In,
-                        sgMaxDepth = -1,
-                        sgMinDepth = -1
-                      }
-            let args = config.defaultArgs {argCommand = command}
-            mdGraph args >>= outputContains [Constants.parent_md]
-
-        it "Links may use angle brackets and hint text" $
-          \config -> do
-            let command =
-                  Subgraph $
-                    SubgraphOptions
-                      { sgTargets = [FileTarget $ config.testFiles._angleBrackets_md],
-                        sgInclNonex = True,
-                        sgInclStatic = True,
-                        sgTagDir = TagDirection.In,
-                        sgMaxDepth = -1,
-                        sgMinDepth = -1
-                      }
-            let args = config.defaultArgs {argCommand = command}
-            mdGraph args >>= outputContains [Constants.parent_md]
+            mdGraph args >>= outputContains [doesNotExist]
 
 populateSpec :: Spec
 populateSpec = do
@@ -166,7 +138,7 @@ populateSpec = do
           dbDocuments `shouldContain` [Constants.linkChain2_md]
           dbDocuments `shouldNotContain` [Constants.linkChain1_md]
 
-          -- Populate linkChain1
+          -- Scan linkChain1
           let scanOpt = ScanSome [config.testFiles._linkChain1_md]
           let args' = config.defaultArgs {argCommand = Populate, argScan = scanOpt}
           _ <- mdGraph args'
@@ -176,3 +148,17 @@ populateSpec = do
           let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
           queryResultPaths `shouldContain` [Constants.linkChain2_md]
           queryResultPaths `shouldNotContain` [Constants.linkChain3_md]
+
+      it "User can choose not to scan any files and results will be returned from the database" $
+        \config -> do
+          -- Populate all
+          let args = config.defaultArgs {argCommand = Populate}
+          mdGraph args
+
+          -- Update a file
+          config.createDoc config.testFiles._linkChain1_md "This file no longer links to anything"
+
+          -- The existing database contents should be returned
+          let command = Subgraph $ baseSgOptions {sgTargets = [FileTarget config.testFiles._linkChain1_md]}
+          let args = config.defaultArgs {argCommand = command, argScan = ScanNone}
+          mdGraph args >>= outputContains [takeFileName config.testFiles._linkChain2_md]

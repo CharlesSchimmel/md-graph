@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
 
-module Spec.Base where
+module Spec.Base (SpecConfig (..), specSetup, baseSgOptions, outputContains, outputDoesNotContain, mkLink) where
 
 import Constants
 import Control.Exception.Base
@@ -16,6 +16,7 @@ import Data.String (IsString)
 import Data.Text as Text
 import Data.Text.IO as Text
 import MdGraph.App.Arguments
+import MdGraph.App.Command
 import qualified MdGraph.App.Command as Command
 import qualified MdGraph.App.LogLevel as LogLevel
 import qualified MdGraph.TagDirection as TagDirection
@@ -25,6 +26,7 @@ import System.IO
 import qualified System.IO
 import System.Random
 import Test.Hspec
+import Text.Printf
 
 -- | Add an extension only if one doesn't already exist
 (+<.>) :: FilePath -> FilePath -> FilePath
@@ -34,43 +36,34 @@ data SpecConfig = SpecConfig
   { specLibraryDir :: FilePath,
     testFiles :: TestFiles,
     defaultArgs :: Arguments,
-    dbPath :: Text
+    dbPath :: Text,
+    -- | Create a document in the library, relative to the library. Returns the document's absolute filepath
+    createDoc :: FilePath -> Text -> IO FilePath
   }
-  deriving (Show)
 
 specSetup :: SpecWith SpecConfig -> Spec
 specSetup = around withTempLibrary
 
 withTempLibrary :: (SpecConfig -> IO ()) -> IO ()
-withTempLibrary action = bracket setupTestLibrary (const $ return ()) $ \config ->
+withTempLibrary action = do
+  config <- setupTestLibrary -- Could tear it down but idk I don't like to delete things off the filesystem.
+  let logLibraryDirOnTestFailure = onException (action config) (logTestLibrary config)
   bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
-    System.IO.putStrLn $ "Using temp library dir: " ++ config.specLibraryDir
     setCurrentDirectory config.specLibraryDir
-    action config
+    logLibraryDirOnTestFailure
+  where
+    logTestLibrary :: SpecConfig -> IO ()
+    logTestLibrary config = printf "Used temp library dir: %s\n" config.specLibraryDir
 
 setupTestLibrary :: IO SpecConfig
 setupTestLibrary = do
   config <- mkSetupConfig
   let putDoc' = putDoc config.specLibraryDir
-  putDoc' "angle-brackets" ["[Links to parent](<./parent.md> \"this is hint text\")"]
-  putDoc' "has-nonexistent-link" ["[This link is broken and goes nowhere](./link-to-nonexistent-file.md)"]
-  putDoc'
-    "has-static-file-link"
-    [ "[This is a link to static file](./static.txt)",
-      "",
-      "[This is a link to a static file in the subdir](./subdir/static2.txt)"
-    ]
   putDoc' "link chain 1" ["[forward to link 2](./link chain 2.md)"]
   putDoc' "link chain 2" ["[forward to link 3](./link chain 3.md)"]
   putDoc' "link chain 3" ["[forward to link 4](./link chain 4.md)"]
-  putDoc' "link chain 4" ["This file Just exists"]
-  putDoc' "links-dont-have-extensions" ["[This link doesn't have an extension](./parent)"]
+  putDoc' "link chain 4" ["This file just exists"]
   putDoc' "parent" ["Parent"]
-  putDoc' "orphan" ["This file has no links, and no files link to it"]
-  putDoc' "unreachable" ["This file has no links to it, but links to [parent](./parent.md)"]
-  putDoc' "static.txt" ["Pretend this is a static file, like an image"]
-  putDoc' "subdir/static2.txt" ["Pretend this is a static file, like an image"]
-  putDoc' "subdir/uses convoluted directory traversal" ["[Convoluted relative directory traversal](../subdir/../parent.md)"]
   putDoc'
     "subdir/uses directory traversal"
     [ "[Relative directory traversal](../parent.md)",
@@ -79,11 +72,12 @@ setupTestLibrary = do
     ]
   return config
 
-putDoc :: FilePath -> FilePath -> [Text] -> IO ()
+putDoc :: FilePath -> FilePath -> [Text] -> IO FilePath
 putDoc libDir docName lines = do
   let docPath = libDir </> docName +<.> "md"
   withFile docPath WriteMode $ \handle ->
     Monad.mapM_ (Text.hPutStr handle) lines
+  return docPath
 
 createTempLibraryDir :: IO FilePath
 createTempLibraryDir = do
@@ -110,13 +104,13 @@ mkSetupConfig = do
       { specLibraryDir = libDir,
         testFiles = Constants.testFiles libDir,
         defaultArgs = args,
-        dbPath = dbFile
+        dbPath = dbFile,
+        createDoc = \path content -> putDoc libDir path [content]
       }
 
-getLibraryDir :: IO FilePath
-getLibraryDir = do
-  curDir <- getCurrentDirectory
-  return $ curDir </> "test" </> "library"
+-- | Build a markdown link of the form [linkText)(path)
+mkLink :: Text -> FilePath -> Text
+mkLink linkText path = Text.concat ["[", linkText, "](./", Text.pack path, ")"]
 
 defaultSpecArgs :: Arguments
 defaultSpecArgs =
@@ -127,6 +121,17 @@ defaultSpecArgs =
       argLogLevel = LogLevel.None,
       argCommand = Command.Populate,
       argScan = ScanAll
+    }
+
+baseSgOptions :: SubgraphOptions
+baseSgOptions =
+  SubgraphOptions
+    { sgInclNonex = False,
+      sgInclStatic = False,
+      sgTagDir = TagDirection.In,
+      sgMaxDepth = subgraphDefaultMaxDepth,
+      sgTargets = [],
+      sgMinDepth = subgraphDefaultMinDepth
     }
 
 shouldReturnFrom :: (HasCallStack, Show a, Eq a) => a -> IO a -> Expectation
