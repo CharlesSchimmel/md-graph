@@ -89,6 +89,21 @@ isAncestorOf (AbsolutePath parentPath) (AbsolutePath childPath) =
       commonDirs = takeWhile (\(parentDir, childDir) -> parentDir == childDir) zipped
    in length parentDirs == length commonDirs
 
--- | System.FilePath.makeRelative, lifted to AbsolutePaths. Returns a FilePath (not a RelativePath) because it's not guaranteed to be Relative.
+-- | System.FilePath.makeRelative, lifted to AbsolutePaths. Returns a FilePath (not a RelativePath) because it's not guaranteed to be Relative. makeRelative "/foo/bar" "/foo/bar/baz" becomes "baz"
 makeRelative :: AbsolutePath -> AbsolutePath -> FilePath
 makeRelative (AbsolutePath source) (AbsolutePath dest) = System.FilePath.makeRelative source dest
+
+-- | Create a relative filepath with traversals from one directory to another.
+-- makeRelativeTraversal "/foo/bar/qux/wam" "/foo/baz/wiz" -> "../../../baz/wiz"
+makeRelativeTraversal :: FilePath -> FilePath -> FilePath
+makeRelativeTraversal pathStart pathEnd =
+  let pathADirectories = splitDirectories pathStart
+      pathBDirectories = splitDirectories pathEnd
+      zipped = zip pathADirectories pathBDirectories
+      commonParts = takeWhile (\(a, b) -> a == b) zipped
+      pathADangling = Prelude.drop (Prelude.length commonParts) pathADirectories
+      pathBDangling = Prelude.drop (Prelude.length commonParts) pathBDirectories
+      upwardsTraversals = foldr (</>) "" $ replicate (Prelude.length pathADangling) ".."
+      pathBUncommonPath = foldr (</>) "" pathBDangling
+      relativePath = upwardsTraversals </> pathBUncommonPath
+   in relativePath

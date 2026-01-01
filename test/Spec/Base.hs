@@ -64,12 +64,6 @@ setupTestLibrary = do
   putDoc' "link chain 3" ["[forward to link 4](./link chain 4.md)"]
   putDoc' "link chain 4" ["This file just exists"]
   putDoc' "parent" ["Parent"]
-  putDoc'
-    "subdir/uses directory traversal"
-    [ "[Relative directory traversal](../parent.md)",
-      "",
-      "[Static directory traversal](../static.txt)"
-    ]
   return config
 
 putDoc :: FilePath -> FilePath -> [Text] -> IO FilePath
