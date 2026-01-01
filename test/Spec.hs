@@ -42,7 +42,7 @@ main = do
     specSetup $
       describe "Path handling" $ do
         it "Absolute paths are accepted and relativized to the library" $
-          \SpecConfig {..} -> do
+          \SpecEnv {..} -> do
             let command =
                   Subgraph $
                     baseSgOptions
@@ -53,7 +53,7 @@ main = do
             mdGraph args >>= outputContains [takeFileName testFiles._linkChain1_md]
 
         it "Paths relative to the current directory are accepted and relativized to the library" $
-          \SpecConfig {..} -> do
+          \SpecEnv {..} -> do
             let command =
                   Subgraph $
                     baseSgOptions

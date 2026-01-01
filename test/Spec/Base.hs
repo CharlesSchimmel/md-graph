@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
 
-module Spec.Base (SpecConfig (..), specSetup, baseSgOptions, outputContains, outputDoesNotContain, mkLink) where
+module Spec.Base (SpecEnv (..), specSetup, baseSgOptions, outputContains, outputDoesNotContain, mkLink) where
 
 import Constants
 import Control.Exception.Base
@@ -32,7 +32,7 @@ import Text.Printf
 (+<.>) :: FilePath -> FilePath -> FilePath
 path +<.> extension = if hasExtension path then path else path <.> extension
 
-data SpecConfig = SpecConfig
+data SpecEnv = SpecEnv
   { specLibraryDir :: FilePath,
     testFiles :: TestFiles,
     defaultArgs :: Arguments,
@@ -41,10 +41,10 @@ data SpecConfig = SpecConfig
     createDoc :: FilePath -> Text -> IO FilePath
   }
 
-specSetup :: SpecWith SpecConfig -> Spec
+specSetup :: SpecWith SpecEnv -> Spec
 specSetup = around withTempLibrary
 
-withTempLibrary :: (SpecConfig -> IO ()) -> IO ()
+withTempLibrary :: (SpecEnv -> IO ()) -> IO ()
 withTempLibrary action = do
   config <- setupTestLibrary -- Could tear it down but idk I don't like to delete things off the filesystem.
   let logLibraryDirOnTestFailure = onException (action config) (logTestLibrary config)
@@ -52,10 +52,10 @@ withTempLibrary action = do
     setCurrentDirectory config.specLibraryDir
     logLibraryDirOnTestFailure
   where
-    logTestLibrary :: SpecConfig -> IO ()
+    logTestLibrary :: SpecEnv -> IO ()
     logTestLibrary config = printf "Used temp library dir: %s\n" config.specLibraryDir
 
-setupTestLibrary :: IO SpecConfig
+setupTestLibrary :: IO SpecEnv
 setupTestLibrary = do
   config <- mkSetupConfig
   let putDoc' = putDoc config.specLibraryDir
@@ -89,7 +89,7 @@ createTempLibraryDir = do
   createDirectory $ testLibPath </> "subdir"
   return testLibPath
 
-mkSetupConfig :: IO SpecConfig
+mkSetupConfig :: IO SpecEnv
 mkSetupConfig = do
   libDir <- createTempLibraryDir
 
@@ -100,7 +100,7 @@ mkSetupConfig = do
             argDatabase = DbFile dbFile
           }
   return $
-    SpecConfig
+    SpecEnv
       { specLibraryDir = libDir,
         testFiles = Constants.testFiles libDir,
         defaultArgs = args,
