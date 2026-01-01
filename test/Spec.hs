@@ -39,6 +39,22 @@ main = do
     populateSpec
     -- let Constants.TestFiles {..} = testFiles libraryDir
 
+    let blah pathStart pathEnd =
+          let pathADirectories = splitDirectories pathStart
+              pathBDirectories = splitDirectories pathEnd
+              zipped = zip pathADirectories pathBDirectories
+              commonParts = takeWhile (\(a, b) -> a == b) zipped
+              pathADangling = Prelude.drop (Prelude.length commonParts) pathADirectories
+              pathBDangling = Prelude.drop (Prelude.length commonParts) pathBDirectories
+              upwardsTraversals = foldr (</>) "" $ replicate (Prelude.length pathADangling) ".."
+              pathBUncommonPath = foldr (</>) "" pathBDangling
+              relativePath = upwardsTraversals </> pathBUncommonPath
+           in relativePath
+
+    describe "Make Relative" $ do
+      fit "Make Relative" $ do
+        blah "/foo/bar/qux/wam" "/foo/baz/wiz" `shouldBe` "../../../baz/wiz"
+
     specSetup $
       describe "Path handling" $ do
         it "Absolute paths are accepted and relativized to the library" $

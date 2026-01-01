@@ -12,6 +12,12 @@ linkChain4_md = "link chain 4.md"
 
 parent_md = "parent.md"
 
+data TestFile' = TestFile'
+  { absolute :: FilePath,
+    relativeFromLibrary :: FilePath,
+    relativeFromCurrent :: FilePath
+  }
+
 data TestFiles = TestFiles
   { _linkChain1_md :: FilePath,
     _linkChain2_md :: FilePath,
