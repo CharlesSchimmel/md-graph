@@ -37,9 +37,8 @@ main = do
     FilesSpec.spec
     SubgraphSpec.spec
     populateSpec
-    -- let Constants.TestFiles {..} = testFiles libraryDir
 
-    specSetup $
+    setupSpecEnv $
       describe "Path handling" $ do
         it "Absolute paths are accepted and relativized to the library" $
           \SpecEnv {..} -> do
@@ -86,7 +85,7 @@ main = do
             let args = env.defaultArgs {argCommand = command}
             mdGraph args >>= outputContains [usesConvolutedDirectoryTraversal]
 
-    specSetup $
+    setupSpecEnv $
       describe "Orphans" $ do
         it "Files with no links to or from them are identified as orphans" $
           \env -> do
@@ -102,7 +101,7 @@ main = do
             let args = env.defaultArgs {argCommand = Command.Unreachable}
             mdGraph args >>= outputDoesNotContain [orphanFile]
 
-    specSetup $
+    setupSpecEnv $
       describe "Unreachable" $ do
         it "Files that have links but have no links to them are identified as unreachable" $
           \env -> do
@@ -111,7 +110,7 @@ main = do
             let args = env.defaultArgs {argCommand = Command.Unreachable}
             mdGraph args >>= outputContains [unreachable]
 
-    specSetup $
+    setupSpecEnv $
       describe "Nonexistent" $ do
         it "Nonexistent returns links that do not resolve to a file" $
           \env -> do
@@ -123,7 +122,7 @@ main = do
 
 populateSpec :: Spec
 populateSpec = do
-  specSetup $
+  setupSpecEnv $
     describe "Scan Options" $ do
       it "User can specify specific files to scan" $
         \env -> do

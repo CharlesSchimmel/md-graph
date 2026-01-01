@@ -1,3 +1,5 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module Constants where
 
 import System.FilePath
@@ -12,11 +14,12 @@ linkChain4_md = "link chain 4.md"
 
 parent_md = "parent.md"
 
-data TestFile' = TestFile'
+data TestFile = TestFile
   { absolute :: FilePath,
-    relativeFromLibrary :: FilePath,
-    relativeFromCurrent :: FilePath
+    pathFromLibrary :: FilePath,
+    pathFromCurrent :: FilePath
   }
+  deriving (Show)
 
 data TestFiles = TestFiles
   { _linkChain1_md :: FilePath,
@@ -24,6 +27,15 @@ data TestFiles = TestFiles
     _linkChain3_md :: FilePath,
     _linkChain4_md :: FilePath,
     _parent_md :: FilePath
+  }
+  deriving (Show)
+
+data TestFiles' = TestFiles'
+  { _linkChain1_md :: TestFile,
+    _linkChain2_md :: TestFile,
+    _linkChain3_md :: TestFile,
+    _linkChain4_md :: TestFile,
+    _parent_md :: TestFile
   }
   deriving (Show)
 

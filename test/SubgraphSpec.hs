@@ -20,7 +20,7 @@ main = do
 
 spec :: Spec
 spec = do
-  specSetup $
+  setupSpecEnv $
     describe "Backlinks" $ do
       let baseBacklinkOptions =
             BacklinkOptions
@@ -47,7 +47,7 @@ spec = do
         mdGraph args >>= outputDoesNotContain [Constants.linkChain3_md, Constants.linkChain4_md]
         mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md]
 
-  specSetup $
+  setupSpecEnv $
     describe "Subgraph" $ do
       it "Return the full subgraph of a file" $ \env -> do
         let command =
@@ -133,7 +133,7 @@ spec = do
         let args = env.defaultArgs {argCommand = command}
         mdGraph args >>= outputDoesNotContain [staticpng]
 
-  specSetup $
+  setupSpecEnv $
     describe "Path handling" $ do
       it "Absolute paths are accepted and relativized to the library" $ \env -> do
         let command =
@@ -146,7 +146,7 @@ spec = do
         mdGraph args >>= outputContains [Constants.linkChain1_md]
 
       it "Paths relative to the current directory are accepted and relativized to the library" $ \env -> do
-        let libraryName = takeFileName env.specLibraryDir
+        let libraryName = takeFileName env.libraryDir
         withCurrentDirectory "../" $ do
           let command =
                 Subgraph $

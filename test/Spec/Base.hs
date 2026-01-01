@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
 
-module Spec.Base (SpecEnv (..), specSetup, baseSgOptions, outputContains, outputDoesNotContain, mkLink) where
+module Spec.Base (SpecEnv (..), setupSpecEnv, baseSgOptions, outputContains, outputDoesNotContain, mkLink) where
 
 import Constants
 import Control.Exception.Base
@@ -33,55 +33,44 @@ import Text.Printf
 path +<.> extension = if hasExtension path then path else path <.> extension
 
 data SpecEnv = SpecEnv
-  { specLibraryDir :: FilePath,
+  { libraryDir :: FilePath,
     testFiles :: TestFiles,
     defaultArgs :: Arguments,
     dbPath :: Text,
-    -- | Create a document in the library, relative to the library. Returns the document's absolute filepath
-    createDoc :: FilePath -> Text -> IO FilePath
+    -- | Create a document in the library, relative to the library. Returns the document's Absolute filepath.
+    createDoc ::
+      -- \| The relative filepath for the document to create. It will be created relative to the library.
+      FilePath ->
+      -- \| Document content
+      Text ->
+      -- \| The absolute path of the created document
+      IO FilePath
   }
 
-specSetup :: SpecWith SpecEnv -> Spec
-specSetup = around withTempLibrary
+setupSpecEnv :: SpecWith SpecEnv -> Spec
+setupSpecEnv = around withTempLibrary
 
 withTempLibrary :: (SpecEnv -> IO ()) -> IO ()
 withTempLibrary action = do
-  config <- setupTestLibrary -- Could tear it down but idk I don't like to delete things off the filesystem.
+  config <- mkSpecEnv
+  initCommonTestDocuments config
+
   let logLibraryDirOnTestFailure = onException (action config) (logTestLibrary config)
   bracket getCurrentDirectory setCurrentDirectory $ \_ -> do
-    setCurrentDirectory config.specLibraryDir
+    setCurrentDirectory config.libraryDir
     logLibraryDirOnTestFailure
   where
     logTestLibrary :: SpecEnv -> IO ()
-    logTestLibrary config = printf "Used temp library dir: %s\n" config.specLibraryDir
+    logTestLibrary config = printf "Used temp library dir: %s\n" config.libraryDir
 
-setupTestLibrary :: IO SpecEnv
-setupTestLibrary = do
-  config <- mkSpecEnv
-  let putDoc' = putDoc config.specLibraryDir
-  putDoc' "link chain 1" ["[forward to link 2](./link chain 2.md)"]
-  putDoc' "link chain 2" ["[forward to link 3](./link chain 3.md)"]
-  putDoc' "link chain 3" ["[forward to link 4](./link chain 4.md)"]
-  putDoc' "link chain 4" ["This file just exists"]
-  putDoc' "parent" ["Parent"]
-  return config
-
-putDoc :: FilePath -> FilePath -> [Text] -> IO FilePath
-putDoc libDir docName lines = do
-  let docPath = libDir </> docName +<.> "md"
-  withFile docPath WriteMode $ \handle ->
-    Monad.mapM_ (Text.hPutStr handle) lines
-  return docPath
-
-createTempLibraryDir :: IO FilePath
-createTempLibraryDir = do
-  systemTempDir <- getTemporaryDirectory
-  rand <- randomRIO (1000000, 9999999) :: IO Int
-  let randomLibDirName = "library-" ++ show rand
-  let testLibPath = systemTempDir </> "md-graph-test" </> randomLibDirName
-  createDirectoryIfMissing True testLibPath
-  createDirectory $ testLibPath </> "subdir"
-  return testLibPath
+initCommonTestDocuments :: SpecEnv -> IO ()
+initCommonTestDocuments config = do
+  config.createDoc "link chain 1" "[forward to link 2](./link chain 2.md)"
+  config.createDoc "link chain 2" "[forward to link 3](./link chain 3.md)"
+  config.createDoc "link chain 3" "[forward to link 4](./link chain 4.md)"
+  config.createDoc "link chain 4" "This file just exists"
+  config.createDoc "parent" "Parent"
+  createDirectory $ config.libraryDir </> "subdir"
 
 mkSpecEnv :: IO SpecEnv
 mkSpecEnv = do
@@ -95,12 +84,28 @@ mkSpecEnv = do
           }
   return $
     SpecEnv
-      { specLibraryDir = libDir,
+      { libraryDir = libDir,
         testFiles = Constants.testFiles libDir,
         defaultArgs = args,
         dbPath = dbFile,
         createDoc = \path content -> putDoc libDir path [content]
       }
+
+createTempLibraryDir :: IO FilePath
+createTempLibraryDir = do
+  systemTempDir <- getTemporaryDirectory
+  rand <- randomRIO (1000000, 9999999) :: IO Int
+  let randomLibDirName = "library-" ++ show rand
+  let testLibPath = systemTempDir </> "md-graph-test" </> randomLibDirName
+  createDirectoryIfMissing True testLibPath
+  return testLibPath
+
+putDoc :: FilePath -> FilePath -> [Text] -> IO FilePath
+putDoc libDir docName lines = do
+  let docPath = libDir </> docName +<.> "md"
+  withFile docPath WriteMode $ \handle ->
+    Monad.mapM_ (Text.hPutStr handle) lines
+  return docPath
 
 -- | Build a markdown link of the form [linkText)(path)
 mkLink :: Text -> FilePath -> Text
