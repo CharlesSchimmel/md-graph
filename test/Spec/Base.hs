@@ -57,7 +57,7 @@ withTempLibrary action = do
 
 setupTestLibrary :: IO SpecEnv
 setupTestLibrary = do
-  config <- mkSetupConfig
+  config <- mkSpecEnv
   let putDoc' = putDoc config.specLibraryDir
   putDoc' "link chain 1" ["[forward to link 2](./link chain 2.md)"]
   putDoc' "link chain 2" ["[forward to link 3](./link chain 3.md)"]
@@ -89,8 +89,8 @@ createTempLibraryDir = do
   createDirectory $ testLibPath </> "subdir"
   return testLibPath
 
-mkSetupConfig :: IO SpecEnv
-mkSetupConfig = do
+mkSpecEnv :: IO SpecEnv
+mkSpecEnv = do
   libDir <- createTempLibraryDir
 
   let dbFile = Text.pack $ libDir </> "md-graph.db"

@@ -63,62 +63,62 @@ main = do
             mdGraph args >>= outputContains [takeFileName testFiles._linkChain1_md]
 
         it "Relative directory traversals are resolved and simplified" $
-          \config -> do
+          \env -> do
             let usesDirectoryTraversal = "subdir/uses-directory-traversal.md"
-            config.createDoc usesDirectoryTraversal "[parent](../parent.md)"
+            env.createDoc usesDirectoryTraversal "[parent](../parent.md)"
             let command =
                   Subgraph $
                     baseSgOptions
                       { sgTargets = [FileTarget $ usesDirectoryTraversal]
                       }
-            let args = config.defaultArgs {argCommand = command}
+            let args = env.defaultArgs {argCommand = command}
             mdGraph args >>= outputContains [usesDirectoryTraversal]
 
         it "Convoluted directory traversals are resolved and simplified" $
-          \config -> do
+          \env -> do
             let usesConvolutedDirectoryTraversal = "subdir/uses-convoluted-directory-traversal.md"
-            config.createDoc usesConvolutedDirectoryTraversal "[Convoluted relative directory traversal](../subdir/../parent.md)"
+            env.createDoc usesConvolutedDirectoryTraversal "[Convoluted relative directory traversal](../subdir/../parent.md)"
             let command =
                   Subgraph $
                     baseSgOptions
                       { sgTargets = [FileTarget $ usesConvolutedDirectoryTraversal]
                       }
-            let args = config.defaultArgs {argCommand = command}
+            let args = env.defaultArgs {argCommand = command}
             mdGraph args >>= outputContains [usesConvolutedDirectoryTraversal]
 
     specSetup $
       describe "Orphans" $ do
         it "Files with no links to or from them are identified as orphans" $
-          \config -> do
+          \env -> do
             let orphanFile = "orphan.md"
-            config.createDoc orphanFile "annie or oliver"
-            let args = config.defaultArgs {argCommand = Command.Orphans}
+            env.createDoc orphanFile "annie or oliver"
+            let args = env.defaultArgs {argCommand = Command.Orphans}
             mdGraph args >>= outputContains [orphanFile]
 
         it "Orphan files are not identified as unreachable" $
-          \config -> do
+          \env -> do
             let orphanFile = "orphan.md"
-            config.createDoc orphanFile "annie or oliver"
-            let args = config.defaultArgs {argCommand = Command.Unreachable}
+            env.createDoc orphanFile "annie or oliver"
+            let args = env.defaultArgs {argCommand = Command.Unreachable}
             mdGraph args >>= outputDoesNotContain [orphanFile]
 
     specSetup $
       describe "Unreachable" $ do
         it "Files that have links but have no links to them are identified as unreachable" $
-          \config -> do
+          \env -> do
             let unreachable = "unreachable.md"
-            config.createDoc unreachable "[parent](./parent.md)"
-            let args = config.defaultArgs {argCommand = Command.Unreachable}
+            env.createDoc unreachable "[parent](./parent.md)"
+            let args = env.defaultArgs {argCommand = Command.Unreachable}
             mdGraph args >>= outputContains [unreachable]
 
     specSetup $
       describe "Nonexistent" $ do
         it "Nonexistent returns links that do not resolve to a file" $
-          \config -> do
+          \env -> do
             let unreachable = "nonexistent.md"
             let doesNotExist = "does not exist.md"
-            config.createDoc unreachable . Text.pack $ "[this link does not exist](./" ++ doesNotExist ++ ")"
-            let args = config.defaultArgs {argCommand = Command.Nonexes}
+            env.createDoc unreachable . Text.pack $ "[this link does not exist](./" ++ doesNotExist ++ ")"
+            let args = env.defaultArgs {argCommand = Command.Nonexes}
             mdGraph args >>= outputContains [doesNotExist]
 
 populateSpec :: Spec
@@ -126,39 +126,39 @@ populateSpec = do
   specSetup $
     describe "Scan Options" $ do
       it "User can specify specific files to scan" $
-        \config -> do
+        \env -> do
           -- Populate only linkChain2_md
-          let scanOpt = ScanSome [config.testFiles._linkChain2_md]
-          let args' = config.defaultArgs {argCommand = Populate, argScan = scanOpt}
+          let scanOpt = ScanSome [env.testFiles._linkChain2_md]
+          let args' = env.defaultArgs {argCommand = Populate, argScan = scanOpt}
           mdGraph args'
 
           -- It should be the only document in the database, even though it has forward and backward links and there are more in the library
-          rawQueryResults <- runSqlite config.dbPath $ getAllDocuments
+          rawQueryResults <- runSqlite env.dbPath $ getAllDocuments
           let dbDocuments = fmap documentPath $ entityVal <$> rawQueryResults
           dbDocuments `shouldContain` [Constants.linkChain2_md]
           dbDocuments `shouldNotContain` [Constants.linkChain1_md]
 
           -- Scan linkChain1
-          let scanOpt = ScanSome [config.testFiles._linkChain1_md]
-          let args' = config.defaultArgs {argCommand = Populate, argScan = scanOpt}
+          let scanOpt = ScanSome [env.testFiles._linkChain1_md]
+          let args' = env.defaultArgs {argCommand = Populate, argScan = scanOpt}
           _ <- mdGraph args'
 
           -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md, but no others.
-          rawQueryResults <- runSqlite config.dbPath $ forwardLinks Constants.linkChain1_md
+          rawQueryResults <- runSqlite env.dbPath $ forwardLinks Constants.linkChain1_md
           let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
           queryResultPaths `shouldContain` [Constants.linkChain2_md]
           queryResultPaths `shouldNotContain` [Constants.linkChain3_md]
 
       it "User can choose not to scan any files and results will be returned from the database" $
-        \config -> do
+        \env -> do
           -- Populate all
-          let args = config.defaultArgs {argCommand = Populate}
+          let args = env.defaultArgs {argCommand = Populate}
           mdGraph args
 
           -- Update a file
-          config.createDoc config.testFiles._linkChain1_md "This file no longer links to anything"
+          env.createDoc env.testFiles._linkChain1_md "This file no longer links to anything"
 
           -- The existing database contents should be returned
-          let command = Subgraph $ baseSgOptions {sgTargets = [FileTarget config.testFiles._linkChain1_md]}
-          let args = config.defaultArgs {argCommand = command, argScan = ScanNone}
-          mdGraph args >>= outputContains [takeFileName config.testFiles._linkChain2_md]
+          let command = Subgraph $ baseSgOptions {sgTargets = [FileTarget env.testFiles._linkChain1_md]}
+          let args = env.defaultArgs {argCommand = command, argScan = ScanNone}
+          mdGraph args >>= outputContains [takeFileName env.testFiles._linkChain2_md]
