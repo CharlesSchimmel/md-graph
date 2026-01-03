@@ -30,57 +30,57 @@ spec = do
               }
 
       it "With the default min depth, backlinks does not include the target file" $ \env -> do
-        let command = Backlinks $ baseBacklinkOptions {blTargets = [FileTarget $ env.testFiles._linkChain4_md]}
+        let command = Backlinks $ baseBacklinkOptions {blTargets = [FileTarget $ env.testFiles.linkChain4.absolute]}
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain3_md]
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain4_md]
+        mdGraph args >>= outputContains [env.testFiles.linkChain3.pathFromLibrary]
+        mdGraph args >>= outputDoesNotContain [env.testFiles.linkChain4.pathFromLibrary]
 
       it "With a min depth of 0, backlinks _does_ include the target file" $ \env -> do
-        let command = Backlinks $ baseBacklinkOptions {blTargets = [FileTarget $ env.testFiles._linkChain4_md], blMinDepth = 0}
+        let command = Backlinks $ baseBacklinkOptions {blTargets = [FileTarget $ env.testFiles.linkChain4.absolute], blMinDepth = 0}
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain3_md, Constants.linkChain4_md]
+        mdGraph args >>= outputContains [env.testFiles.linkChain3.pathFromLibrary, env.testFiles.linkChain4.pathFromLibrary]
 
       it "With a min depth of 2, backlinks only includes files 2 links away" $ \env -> do
         let command =
-              Backlinks $ BacklinkOptions {blTargets = [FileTarget $ env.testFiles._linkChain4_md], blMinDepth = 2, blMaxDepth = -1}
+              Backlinks $ BacklinkOptions {blTargets = [FileTarget $ env.testFiles.linkChain4.absolute], blMinDepth = 2, blMaxDepth = -1}
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain3_md, Constants.linkChain4_md]
-        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md]
+        mdGraph args >>= outputDoesNotContain [env.testFiles.linkChain3.pathFromLibrary, env.testFiles.linkChain4.pathFromLibrary]
+        mdGraph args >>= outputContains [env.testFiles.linkChain1.pathFromLibrary, env.testFiles.linkChain2.pathFromLibrary]
 
   setupSpecEnv $
     describe "Subgraph" $ do
       it "Return the full subgraph of a file" $ \env -> do
         let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles._linkChain1_md]}
+              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles.linkChain1.absolute]}
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md, Constants.linkChain4_md]
+        mdGraph args >>= outputContains [env.testFiles.linkChain1.pathFromLibrary, env.testFiles.linkChain2.pathFromLibrary, env.testFiles.linkChain3.pathFromLibrary, env.testFiles.linkChain4.pathFromLibrary]
 
       it "Max depth is respected" $ \env -> do
         let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles._linkChain1_md], sgMaxDepth = 3}
+              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles.linkChain1.absolute], sgMaxDepth = 3}
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md]
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain4_md]
+        mdGraph args >>= outputContains [env.testFiles.linkChain1.pathFromLibrary, env.testFiles.linkChain2.pathFromLibrary, env.testFiles.linkChain3.pathFromLibrary]
+        mdGraph args >>= outputDoesNotContain [env.testFiles.linkChain4.pathFromLibrary]
 
       it "Min depth 2 is respected" $ \env -> do
         let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles._linkChain1_md], sgMinDepth = 2}
+              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles.linkChain1.absolute], sgMinDepth = 2}
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain3_md, Constants.linkChain4_md]
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain1_md, Constants.linkChain2_md]
+        mdGraph args >>= outputContains [env.testFiles.linkChain3.pathFromLibrary, env.testFiles.linkChain4.pathFromLibrary]
+        mdGraph args >>= outputDoesNotContain [env.testFiles.linkChain1.pathFromLibrary, env.testFiles.linkChain2.pathFromLibrary]
 
       it "Min depth 1 is respected" $ \env -> do
         let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles._linkChain1_md], sgMinDepth = 1}
+              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles.linkChain1.absolute], sgMinDepth = 1}
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain2_md, Constants.linkChain3_md, Constants.linkChain4_md]
-        mdGraph args >>= outputDoesNotContain [Constants.linkChain1_md]
+        mdGraph args >>= outputContains [env.testFiles.linkChain2.pathFromLibrary, env.testFiles.linkChain3.pathFromLibrary, env.testFiles.linkChain4.pathFromLibrary]
+        mdGraph args >>= outputDoesNotContain [env.testFiles.linkChain1.pathFromLibrary]
 
       it "Min depth 0 is respected" $ \env -> do
         let command =
-              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles._linkChain1_md], sgMinDepth = 0}
+              Subgraph $ baseSgOptions {sgTargets = [FileTarget $ env.testFiles.linkChain1.absolute], sgMinDepth = 0}
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain1_md, Constants.linkChain2_md, Constants.linkChain3_md, Constants.linkChain4_md]
+        mdGraph args >>= outputContains [env.testFiles.linkChain1.pathFromLibrary, env.testFiles.linkChain2.pathFromLibrary, env.testFiles.linkChain3.pathFromLibrary, env.testFiles.linkChain4.pathFromLibrary]
 
       it "Nonexistent (broken) links are included if requested" $ \env -> do
         let hasNonexistentLink = "has-nonexistent-link.md"
@@ -139,22 +139,23 @@ spec = do
         let command =
               Subgraph $
                 baseSgOptions
-                  { sgTargets = [FileTarget $ env.testFiles._linkChain1_md],
+                  { sgTargets = [FileTarget $ env.testFiles.linkChain1.absolute],
                     sgMaxDepth = 1
                   }
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain1_md]
+        mdGraph args >>= outputContains [env.testFiles.linkChain1.pathFromLibrary]
 
       it "Paths relative to the current directory are accepted and relativized to the library" $ \env -> do
         let libraryName = takeFileName env.libraryDir
         withCurrentDirectory "../" $ do
+          pathFromCurrent <- env.testFiles.linkChain1.pathFromCurrent
           let command =
                 Subgraph $
                   baseSgOptions
-                    { sgTargets = [FileTarget $ "./" </> libraryName </> Constants.linkChain1_md]
+                    { sgTargets = [FileTarget $ pathFromCurrent]
                     }
           let args = env.defaultArgs {argCommand = command}
-          mdGraph args >>= outputContains [Constants.linkChain1_md]
+          mdGraph args >>= outputContains [env.testFiles.linkChain1.pathFromLibrary]
 
       it "Links with relative directory traversals are resolved and simplified" $ \env -> do
         let usesDirectoryTraversal = "subdir/uses-directory-traversal.md"
@@ -166,7 +167,7 @@ spec = do
                   { sgTargets = [FileTarget $ usesDirectoryTraversal]
                   }
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.parent_md]
+        mdGraph args >>= outputContains [env.testFiles.parent.pathFromLibrary]
 
       it "Convoluted directory traversals are resolved and simplified" $ \env -> do
         let usesConvolutedDirectoryTraversal = "subdir/uses-convoluted-directory-traversal.md"
@@ -178,7 +179,7 @@ spec = do
                   { sgTargets = [FileTarget $ usesConvolutedDirectoryTraversal]
                   }
         let args = env.defaultArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.parent_md]
+        mdGraph args >>= outputContains [env.testFiles.parent.pathFromLibrary]
 
       it "Directory and extensions may be omitted in link paths" $
         \env -> do
@@ -195,7 +196,7 @@ spec = do
                       sgMinDepth = -1
                     }
           let args = env.defaultArgs {argCommand = command}
-          mdGraph args >>= outputContains [Constants.parent_md]
+          mdGraph args >>= outputContains [env.testFiles.parent.pathFromLibrary]
 
       it "Links may use angle brackets and hint text" $
         \env -> do
@@ -212,4 +213,4 @@ spec = do
                       sgMinDepth = -1
                     }
           let args = env.defaultArgs {argCommand = command}
-          mdGraph args >>= outputContains [Constants.parent_md]
+          mdGraph args >>= outputContains [env.testFiles.parent.pathFromLibrary]

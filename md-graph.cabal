@@ -169,7 +169,8 @@ test-suite md-graph-test
       OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      async
+      HUnit
+    , async
     , base
     , containers
     , cryptohash-md5
@@ -179,6 +180,7 @@ test-suite md-graph-test
     , hashable
     , hspec
     , hspec-contrib
+    , hspec-expectations
     , md-graph
     , monad-logger
     , mtl

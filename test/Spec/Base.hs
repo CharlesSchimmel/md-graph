@@ -2,9 +2,19 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
 
-module Spec.Base (SpecEnv (..), setupSpecEnv, baseSgOptions, outputContains, outputDoesNotContain, mkLink) where
+module Spec.Base
+  ( SpecEnv (..),
+    setupSpecEnv,
+    baseSgOptions,
+    outputContains,
+    outputDoesNotContain,
+    mkLink,
+    step,
+  )
+where
 
 import Constants
+import qualified Control.Exception as Exception
 import Control.Exception.Base
 import Control.Monad
 import qualified Control.Monad as Monad
@@ -13,28 +23,27 @@ import Control.Monad.Reader
 import Data.Either as Either
 import qualified Data.List as List
 import Data.String (IsString)
-import Data.Text as Text
+import Data.Text as Text hiding (isInfixOf)
 import Data.Text.IO as Text
 import MdGraph.App.Arguments
 import MdGraph.App.Command
 import qualified MdGraph.App.Command as Command
 import qualified MdGraph.App.LogLevel as LogLevel
+import MdGraph.File
 import qualified MdGraph.TagDirection as TagDirection
 import System.Directory
 import System.FilePath
 import System.IO
 import qualified System.IO
 import System.Random
+import qualified Test.HUnit
+import Test.HUnit.Lang
 import Test.Hspec
 import Text.Printf
 
--- | Add an extension only if one doesn't already exist
-(+<.>) :: FilePath -> FilePath -> FilePath
-path +<.> extension = if hasExtension path then path else path <.> extension
-
 data SpecEnv = SpecEnv
   { libraryDir :: FilePath,
-    testFiles :: TestFiles,
+    testFiles :: TestFiles',
     defaultArgs :: Arguments,
     dbPath :: Text,
     -- | Create a document in the library, relative to the library. Returns the document's Absolute filepath.
@@ -65,12 +74,18 @@ withTempLibrary action = do
 
 initCommonTestDocuments :: SpecEnv -> IO ()
 initCommonTestDocuments config = do
-  config.createDoc "link chain 1" "[forward to link 2](./link chain 2.md)"
-  config.createDoc "link chain 2" "[forward to link 3](./link chain 3.md)"
-  config.createDoc "link chain 3" "[forward to link 4](./link chain 4.md)"
-  config.createDoc "link chain 4" "This file just exists"
-  config.createDoc "parent" "Parent"
-  createDirectory $ config.libraryDir </> "subdir"
+  config.createDoc
+    config.testFiles.linkChain1.pathFromLibrary
+    $ mkLink "to link 2" config.testFiles.linkChain2.pathFromLibrary
+  config.createDoc
+    config.testFiles.linkChain2.pathFromLibrary
+    $ mkLink "to link 3" config.testFiles.linkChain3.pathFromLibrary
+  config.createDoc
+    config.testFiles.linkChain3.pathFromLibrary
+    $ mkLink "to link 4" config.testFiles.linkChain4.pathFromLibrary
+  config.createDoc config.testFiles.linkChain4.pathFromLibrary "This file just exists"
+  config.createDoc config.testFiles.parent.pathFromLibrary "Parent"
+  return ()
 
 mkSpecEnv :: IO SpecEnv
 mkSpecEnv = do
@@ -85,7 +100,7 @@ mkSpecEnv = do
   return $
     SpecEnv
       { libraryDir = libDir,
-        testFiles = Constants.testFiles libDir,
+        testFiles = Constants.testFiles' libDir,
         defaultArgs = args,
         dbPath = dbFile,
         createDoc = \path content -> putDoc libDir path [content]
@@ -98,6 +113,7 @@ createTempLibraryDir = do
   let randomLibDirName = "library-" ++ show rand
   let testLibPath = systemTempDir </> "md-graph-test" </> randomLibDirName
   createDirectoryIfMissing True testLibPath
+  createDirectory $ testLibPath </> "subdir"
   return testLibPath
 
 putDoc :: FilePath -> FilePath -> [Text] -> IO FilePath
@@ -106,6 +122,19 @@ putDoc libDir docName lines = do
   withFile docPath WriteMode $ \handle ->
     Monad.mapM_ (Text.hPutStr handle) lines
   return docPath
+
+putDoc' :: FilePath -> FilePath -> [Text] -> IO TestFile
+putDoc' libDir docName lines = do
+  let pathFromLibrary = docName +<.> "md"
+  let docPath = libDir </> docName +<.> "md"
+  withFile docPath WriteMode $ \handle ->
+    Monad.mapM_ (Text.hPutStr handle) lines
+  return $
+    TestFile
+      { absolute = docPath,
+        pathFromLibrary = pathFromLibrary,
+        pathFromCurrent = getPathFromCurrent docPath
+      }
 
 -- | Build a markdown link of the form [linkText)(path)
 mkLink :: Text -> FilePath -> Text
@@ -149,3 +178,15 @@ outputDoesNotContain rejectedValues eitherList = do
   either failIfLeft shouldNotContainAnyRejectedValues eitherList
   where
     shouldNotContainAnyRejectedValues actualValues = Monad.forM_ rejectedValues $ \value -> actualValues `shouldNotContain` [value]
+
+-- | Annotate expectations by describing the expected case. The annotation will be printed in the test failure output. Intercept HUnitFailure exceptions and prepend a message to them. This is useful when you have multiple similar expectations.
+step :: (HasCallStack) => String -> Expectation -> Expectation
+step msg expectation = catch expectation catcher
+  where
+    msgWithFailed = msg ++ " FAILED: "
+    catcher :: HUnitFailure -> Expectation
+    catcher (HUnitFailure loc (Reason reasonMsg)) = Exception.throwIO $ HUnitFailure loc (Reason (msgWithFailed ++ reasonMsg))
+    -- I think ExpectedButGot is only used with Test.HUnit.Lang.assertEqual, which I don't think hspec-expectations uses
+    catcher (HUnitFailure loc (ExpectedButGot preface expected actual)) =
+      let newPreface = Just $ maybe msgWithFailed (\p -> msgWithFailed ++ p) preface
+       in Exception.throwIO . HUnitFailure loc $ ExpectedButGot newPreface expected actual

@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use uncurry" #-}
@@ -7,6 +8,8 @@ module MdGraph.File
     unrelativize,
     isAncestorOf,
     MdGraph.File.makeRelative,
+    makeRelativeTraversal,
+    (+<.>),
   )
 where
 
@@ -18,6 +21,7 @@ import MdGraph.Config
   )
 import qualified MdGraph.File.Internal as Internal
 import MdGraph.File.Types
+import System.Directory
 import System.FilePath
 import qualified System.FilePath as FilePath
 
@@ -107,3 +111,7 @@ makeRelativeTraversal pathStart pathEnd =
       pathBUncommonPath = foldr (</>) "" pathBDangling
       relativePath = upwardsTraversals </> pathBUncommonPath
    in relativePath
+
+-- | Add an extension only if one doesn't already exist
+(+<.>) :: FilePath -> FilePath -> FilePath
+path +<.> extension = if hasExtension path then path else path <.> extension

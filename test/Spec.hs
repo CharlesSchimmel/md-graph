@@ -45,21 +45,22 @@ main = do
             let command =
                   Subgraph $
                     baseSgOptions
-                      { sgTargets = [FileTarget $ testFiles._linkChain1_md],
+                      { sgTargets = [FileTarget $ testFiles.linkChain1.absolute],
                         sgMaxDepth = 1
                       }
             let args = defaultArgs {argCommand = command}
-            mdGraph args >>= outputContains [takeFileName testFiles._linkChain1_md]
+            mdGraph args >>= outputContains [testFiles.linkChain1.pathFromLibrary]
 
         it "Paths relative to the current directory are accepted and relativized to the library" $
           \SpecEnv {..} -> do
+            pathFromCurrent <- testFiles.linkChain1.pathFromCurrent
             let command =
                   Subgraph $
                     baseSgOptions
-                      { sgTargets = [FileTarget $ takeFileName testFiles._linkChain1_md]
+                      { sgTargets = [FileTarget $ pathFromCurrent]
                       }
             let args = defaultArgs {argCommand = command}
-            mdGraph args >>= outputContains [takeFileName testFiles._linkChain1_md]
+            mdGraph args >>= outputContains [testFiles.linkChain1.pathFromLibrary]
 
         it "Relative directory traversals are resolved and simplified" $
           \env -> do
@@ -120,6 +121,8 @@ main = do
             let args = env.defaultArgs {argCommand = Command.Nonexes}
             mdGraph args >>= outputContains [doesNotExist]
 
+then__ = id
+
 populateSpec :: Spec
 populateSpec = do
   setupSpecEnv $
@@ -127,26 +130,31 @@ populateSpec = do
       it "User can specify specific files to scan" $
         \env -> do
           -- Populate only linkChain2_md
-          let scanOpt = ScanSome [env.testFiles._linkChain2_md]
+          let scanOpt = ScanSome [env.testFiles.linkChain2.absolute]
           let args' = env.defaultArgs {argCommand = Populate, argScan = scanOpt}
           mdGraph args'
 
           -- It should be the only document in the database, even though it has forward and backward links and there are more in the library
           rawQueryResults <- runSqlite env.dbPath $ getAllDocuments
           let dbDocuments = fmap documentPath $ entityVal <$> rawQueryResults
-          dbDocuments `shouldContain` [Constants.linkChain2_md]
-          dbDocuments `shouldNotContain` [Constants.linkChain1_md]
+          step "link-chain-2 is the only document in the database" $
+            dbDocuments `shouldBe` [env.testFiles.linkChain2.pathFromLibrary]
+          step "No other documents are in the database" $
+            dbDocuments `shouldNotContain` [env.testFiles.linkChain1.pathFromLibrary]
 
-          -- Scan linkChain1
-          let scanOpt = ScanSome [env.testFiles._linkChain1_md]
+          -- Scan only linkChain1
+          let scanOpt = ScanSome [env.testFiles.linkChain1.absolute]
           let args' = env.defaultArgs {argCommand = Populate, argScan = scanOpt}
-          _ <- mdGraph args'
+          mdGraph args'
 
           -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md, but no others.
-          rawQueryResults <- runSqlite env.dbPath $ forwardLinks Constants.linkChain1_md
+          rawQueryResults <- runSqlite env.dbPath $ forwardLinks env.testFiles.linkChain1.pathFromLibrary
           let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
-          queryResultPaths `shouldContain` [Constants.linkChain2_md]
-          queryResultPaths `shouldNotContain` [Constants.linkChain3_md]
+          step "Forward links from link-chain-1 are in the database" $
+            queryResultPaths `shouldBe` [env.testFiles.linkChain2.pathFromLibrary]
+
+          step "Forward links from link-chain-2 are not returned" $
+            queryResultPaths `shouldNotContain` [env.testFiles.linkChain3.pathFromLibrary]
 
       it "User can choose not to scan any files and results will be returned from the database" $
         \env -> do
@@ -155,9 +163,9 @@ populateSpec = do
           mdGraph args
 
           -- Update a file
-          env.createDoc env.testFiles._linkChain1_md "This file no longer links to anything"
+          env.createDoc env.testFiles.linkChain1.absolute "This file no longer links to anything"
 
           -- The existing database contents should be returned
-          let command = Subgraph $ baseSgOptions {sgTargets = [FileTarget env.testFiles._linkChain1_md]}
+          let command = Subgraph $ baseSgOptions {sgTargets = [FileTarget env.testFiles.linkChain1.absolute]}
           let args = env.defaultArgs {argCommand = command, argScan = ScanNone}
-          mdGraph args >>= outputContains [takeFileName env.testFiles._linkChain2_md]
+          mdGraph args >>= outputContains [takeFileName env.testFiles.linkChain2.absolute]
