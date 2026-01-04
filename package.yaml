@@ -80,4 +80,6 @@ tests:
     # - hunit
     - hspec
     - hspec-contrib
-
+    - random
+    - hspec-expectations
+    - HUnit # package names are case sensitive???

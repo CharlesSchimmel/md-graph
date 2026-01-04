@@ -51,4 +51,4 @@ argsToConfig args@Arguments {..} = do
     libraryPath = do
       absPath@AbsolutePath {unAbsolutePath = absoluteLibraryDir} <- liftIO $ trueAbsolutePathIO argLibrary
       directoryExists <- liftIO $ maybeDirectory absoluteLibraryDir
-      maybe (throwError "Library directory does not exist") (const . return $ absPath) directoryExists
+      maybe (throwError . T.pack $ "Library directory " ++ absoluteLibraryDir ++ " does not exist") (const . return $ absPath) directoryExists

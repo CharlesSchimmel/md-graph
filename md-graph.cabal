@@ -158,7 +158,6 @@ test-suite md-graph-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Constants
       FilesSpec
       Spec.Base
       SubgraphSpec
@@ -169,7 +168,8 @@ test-suite md-graph-test
       OverloadedStrings, RecordWildCards, NamedFieldPuns, FlexibleContexts, GeneralizedNewtypeDeriving
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      async
+      HUnit
+    , async
     , base
     , containers
     , cryptohash-md5
@@ -179,6 +179,7 @@ test-suite md-graph-test
     , hashable
     , hspec
     , hspec-contrib
+    , hspec-expectations
     , md-graph
     , monad-logger
     , mtl
@@ -189,6 +190,7 @@ test-suite md-graph-test
     , persistent
     , persistent-sqlite
     , persistent-template
+    , random
     , resourcet
     , text
     , time

@@ -24,12 +24,6 @@ instance Hashable RelativePath
 newtype AbsolutePath = AbsolutePath {unAbsolutePath :: FilePath}
   deriving (Show, Ord, Eq, Generic)
 
-class HasPath a where
-  getPath :: a -> FilePath
-
-instance HasPath AbsolutePath where
-  getPath = unAbsolutePath
-
 instance Hashable AbsolutePath
 
 data File = File

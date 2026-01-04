@@ -1,12 +1,12 @@
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# HLINT ignore "Eta reduce" #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-import qualified Constants
 import Data.Either
 import Data.Function ((&))
+import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import Database.Esqueleto.Experimental
 import Database.Persist.Sqlite (Entity (entityVal), runSqlite)
@@ -32,133 +32,139 @@ import Test.Hspec
 
 main :: IO ()
 main = do
-  libraryDir <- getLibraryDir
   hspec $ do
     FilesSpec.spec
-    SubgraphSpec.spec libraryDir
+    SubgraphSpec.spec
     populateSpec
 
-    let baseSgOptions =
-          SubgraphOptions
-            { sgInclNonex = False,
-              sgInclStatic = False,
-              sgTagDir = TagDirection.In,
-              sgMaxDepth = subgraphDefaultMaxDepth,
-              sgTargets = [],
-              sgMinDepth = subgraphDefaultMinDepth
-            }
-    describe "Path handling" $ do
-      it "Absolute paths are accepted and relativized to the library" $ do
-        let command =
-              Subgraph $
-                baseSgOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.linkChain1_md],
-                    sgMaxDepth = 1
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain1_md]
+    setupSpecEnv $
+      describe "Path handling" $ do
+        it "Absolute paths are accepted and relativized to the library" $
+          \SpecEnv {..} -> do
+            let command =
+                  Subgraph $
+                    baseSgOptions
+                      { sgTargets = [FileTarget $ testFiles.linkChain1.absolute],
+                        sgMaxDepth = 1
+                      }
+            let args = defaultArgs {argCommand = command}
+            mdGraph args >>= outputContains [testFiles.linkChain1.pathFromLibrary]
 
-      it "Paths relative to the current directory are accepted and relativized to the library" $ do
-        let command =
-              Subgraph $
-                baseSgOptions
-                  { sgTargets = [FileTarget $ "./test/library" </> Constants.linkChain1_md]
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.linkChain1_md]
+        it "Paths relative to the current directory are accepted and relativized to the library" $
+          \SpecEnv {..} -> do
+            pathFromCurrent <- testFiles.linkChain1.pathFromCurrent
+            let command =
+                  Subgraph $
+                    baseSgOptions
+                      { sgTargets = [FileTarget $ pathFromCurrent]
+                      }
+            let args = defaultArgs {argCommand = command}
+            mdGraph args >>= outputContains [testFiles.linkChain1.pathFromLibrary]
 
-      it "Relative directory traversals are resolved and simplified" $ do
-        let command =
-              Subgraph $
-                baseSgOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.usesDirectoryTraversal_md]
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.parent_md]
+        it "Relative directory traversals are resolved and simplified" $
+          \env -> do
+            let usesDirectoryTraversal = "subdir/uses-directory-traversal.md"
+            env.createDoc usesDirectoryTraversal "[parent](../parent.md)"
+            let command =
+                  Subgraph $
+                    baseSgOptions
+                      { sgTargets = [FileTarget $ usesDirectoryTraversal]
+                      }
+            let args = env.defaultArgs {argCommand = command}
+            mdGraph args >>= outputContains [usesDirectoryTraversal]
 
-      it "Convoluted directory traversals are resolved and simplified" $ do
-        let command =
-              Subgraph $
-                baseSgOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.usesConvolutedDirectoryTraversal_md]
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.parent_md]
+        it "Convoluted directory traversals are resolved and simplified" $
+          \env -> do
+            let usesConvolutedDirectoryTraversal = "subdir/uses-convoluted-directory-traversal.md"
+            env.createDoc usesConvolutedDirectoryTraversal "[Convoluted relative directory traversal](../subdir/../parent.md)"
+            let command =
+                  Subgraph $
+                    baseSgOptions
+                      { sgTargets = [FileTarget $ usesConvolutedDirectoryTraversal]
+                      }
+            let args = env.defaultArgs {argCommand = command}
+            mdGraph args >>= outputContains [usesConvolutedDirectoryTraversal]
 
-    describe "Orphans" $ do
-      it "Files with no links to or from them are identified" $ do
-        let args = defaultSpecArgs {argCommand = Command.Orphans}
-        mdGraph args >>= outputContains [Constants.orphan_md]
+    setupSpecEnv $
+      describe "Orphans" $ do
+        it "Files with no links to or from them are identified as orphans" $
+          \env -> do
+            let orphanFile = "orphan.md"
+            env.createDoc orphanFile "annie or oliver"
+            let args = env.defaultArgs {argCommand = Command.Orphans}
+            mdGraph args >>= outputContains [orphanFile]
 
-      it "Orphan files are not identified as unreachable" $ do
-        let args = defaultSpecArgs {argCommand = Command.Unreachable}
-        mdGraph args >>= outputDoesNotContain [Constants.orphan_md]
+        it "Orphan files are not identified as unreachable" $
+          \env -> do
+            let orphanFile = "orphan.md"
+            env.createDoc orphanFile "annie or oliver"
+            let args = env.defaultArgs {argCommand = Command.Unreachable}
+            mdGraph args >>= outputDoesNotContain [orphanFile]
 
-    describe "Unreachable" $ do
-      it "Files that have links but have no links to them are identified" $ do
-        let args = defaultSpecArgs {argCommand = Command.Unreachable}
-        mdGraph args >>= outputContains [Constants.unreachable_md]
+    setupSpecEnv $
+      describe "Unreachable" $ do
+        it "Files that have links but have no links to them are identified as unreachable" $
+          \env -> do
+            let unreachable = "unreachable.md"
+            env.createDoc unreachable "[parent](./parent.md)"
+            let args = env.defaultArgs {argCommand = Command.Unreachable}
+            mdGraph args >>= outputContains [unreachable]
 
-    describe "Nonexistent" $ do
-      it "Files" $ do
-        let args = defaultSpecArgs {argCommand = Command.Nonexes}
-        mdGraph args >>= outputContains ["link-to-nonexistent-file.md"]
+    setupSpecEnv $
+      describe "Nonexistent" $ do
+        it "Nonexistent returns links that do not resolve to a file" $
+          \env -> do
+            let unreachable = "nonexistent.md"
+            let doesNotExist = "does not exist.md"
+            env.createDoc unreachable . Text.pack $ "[this link does not exist](./" ++ doesNotExist ++ ")"
+            let args = env.defaultArgs {argCommand = Command.Nonexes}
+            mdGraph args >>= outputContains [doesNotExist]
 
-    describe "Parsing" $ do
-      it "File extensions in links may be omitted and the default is used instead" $ do
-        let command =
-              Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.linksDontHaveExtensions_md],
-                    sgInclNonex = True,
-                    sgInclStatic = True,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1,
-                    sgMinDepth = -1
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.parent_md]
-
-      it "Links may use angle brackets and hint text" $ do
-        let command =
-              Subgraph $
-                SubgraphOptions
-                  { sgTargets = [FileTarget $ libraryDir </> Constants.angleBrackets_md],
-                    sgInclNonex = True,
-                    sgInclStatic = True,
-                    sgTagDir = TagDirection.In,
-                    sgMaxDepth = -1,
-                    sgMinDepth = -1
-                  }
-        let args = defaultSpecArgs {argCommand = command}
-        mdGraph args >>= outputContains [Constants.parent_md]
+then__ = id
 
 populateSpec :: Spec
 populateSpec = do
-  describe "Scan Options" $ do
-    it "User can specify specific files to scan" $ do
-      libraryDir <- getLibraryDir
-      withTempDbFile $ \args -> do
-        let dbPath = dbFile $ argDatabase args
+  setupSpecEnv $
+    describe "Scan Options" $ do
+      it "User can specify specific files to scan" $
+        \env -> do
+          -- Populate only linkChain2_md
+          let scanOpt = ScanSome [env.testFiles.linkChain2.absolute]
+          let args' = env.defaultArgs {argCommand = Populate, argScan = scanOpt}
+          mdGraph args'
 
-        -- Populate only linkChain2_md
-        let scanOpt = ScanSome [libraryDir </> Constants.linkChain2_md]
-        let args' = args {argCommand = Populate, argScan = scanOpt}
-        mdGraph args'
+          -- It should be the only document in the database, even though it has forward and backward links and there are more in the library
+          rawQueryResults <- runSqlite env.dbPath $ getAllDocuments
+          let dbDocuments = fmap documentPath $ entityVal <$> rawQueryResults
+          step "link-chain-2 is the only document in the database" $
+            dbDocuments `shouldBe` [env.testFiles.linkChain2.pathFromLibrary]
+          step "No other documents are in the database" $
+            dbDocuments `shouldNotContain` [env.testFiles.linkChain1.pathFromLibrary]
 
-        -- It should be the only document in the database, even though it has forward and backward links and there are more in the library
-        rawQueryResults <- runSqlite dbPath $ getAllDocuments
-        let dbDocuments = fmap documentPath $ entityVal <$> rawQueryResults
-        dbDocuments `shouldContain` [Constants.linkChain2_md]
-        dbDocuments `shouldNotContain` [Constants.linkChain1_md]
+          -- Scan only linkChain1
+          let scanOpt = ScanSome [env.testFiles.linkChain1.absolute]
+          let args' = env.defaultArgs {argCommand = Populate, argScan = scanOpt}
+          mdGraph args'
 
-        -- Populate linkChain1
-        let scanOpt = ScanSome [libraryDir </> Constants.linkChain1_md]
-        let args' = args {argCommand = Populate, argScan = scanOpt}
-        _ <- mdGraph args'
+          -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md, but no others.
+          rawQueryResults <- runSqlite env.dbPath $ forwardLinks env.testFiles.linkChain1.pathFromLibrary
+          let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
+          step "Forward links from link-chain-1 are in the database" $
+            queryResultPaths `shouldBe` [env.testFiles.linkChain2.pathFromLibrary]
 
-        -- Get the forwardLinks of linkChain1_md, it should contain linkChain2_md, but no others.
-        rawQueryResults <- runSqlite dbPath $ forwardLinks Constants.linkChain1_md
-        let queryResultPaths = fmap documentPath $ entityVal <$> rights rawQueryResults
-        queryResultPaths `shouldContain` [Constants.linkChain2_md]
-        queryResultPaths `shouldNotContain` [Constants.linkChain3_md]
+          step "Forward links from link-chain-2 are not returned" $
+            queryResultPaths `shouldNotContain` [env.testFiles.linkChain3.pathFromLibrary]
+
+      it "User can choose not to scan any files and results will be returned from the database" $
+        \env -> do
+          -- Populate all
+          let args = env.defaultArgs {argCommand = Populate}
+          mdGraph args
+
+          -- Update a file
+          env.createDoc env.testFiles.linkChain1.absolute "This file no longer links to anything"
+
+          -- The existing database contents should be returned
+          let command = Subgraph $ baseSgOptions {sgTargets = [FileTarget env.testFiles.linkChain1.absolute]}
+          let args = env.defaultArgs {argCommand = command, argScan = ScanNone}
+          mdGraph args >>= outputContains [takeFileName env.testFiles.linkChain2.absolute]
