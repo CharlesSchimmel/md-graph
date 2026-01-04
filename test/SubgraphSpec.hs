@@ -4,7 +4,6 @@
 
 module SubgraphSpec (spec) where
 
-import qualified Constants
 import MdGraph
 import MdGraph.App.Arguments
 import MdGraph.App.Command

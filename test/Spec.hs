@@ -4,7 +4,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-import Constants
 import Data.Either
 import Data.Function ((&))
 import qualified Data.Text as Text

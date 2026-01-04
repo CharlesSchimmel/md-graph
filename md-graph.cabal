@@ -158,7 +158,6 @@ test-suite md-graph-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Constants
       FilesSpec
       Spec.Base
       SubgraphSpec

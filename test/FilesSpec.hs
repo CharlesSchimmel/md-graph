@@ -1,9 +1,8 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Eta reduce" #-}
 
 module FilesSpec where
 
-{-# HLINT ignore "Eta reduce" #-}
-import qualified Constants
 import Control.Exception (evaluate)
 import qualified Control.Exception as E
 import Control.Monad (unless)

@@ -10,10 +10,11 @@ module Spec.Base
     outputDoesNotContain,
     mkLink,
     step,
+    TestFile (..),
+    TestFiles (..),
   )
 where
 
-import Constants
 import qualified Control.Exception as Exception
 import Control.Exception.Base
 import Control.Monad
@@ -43,7 +44,7 @@ import Text.Printf
 
 data SpecEnv = SpecEnv
   { libraryDir :: FilePath,
-    testFiles :: TestFiles',
+    testFiles :: TestFiles,
     defaultArgs :: Arguments,
     dbPath :: Text,
     -- | Create a document in the library, relative to the library. Returns the document's Absolute filepath.
@@ -54,6 +55,20 @@ data SpecEnv = SpecEnv
       Text ->
       -- \| The absolute path of the created document
       IO FilePath
+  }
+
+data TestFile = TestFile
+  { absolute :: FilePath,
+    pathFromLibrary :: FilePath,
+    pathFromCurrent :: IO FilePath
+  }
+
+data TestFiles = TestFiles
+  { linkChain1 :: TestFile,
+    linkChain2 :: TestFile,
+    linkChain3 :: TestFile,
+    linkChain4 :: TestFile,
+    parent :: TestFile
   }
 
 setupSpecEnv :: SpecWith SpecEnv -> Spec
@@ -100,11 +115,21 @@ mkSpecEnv = do
   return $
     SpecEnv
       { libraryDir = libDir,
-        testFiles = Constants.testFiles' libDir,
+        testFiles = testFiles' libDir,
         defaultArgs = args,
         dbPath = dbFile,
         createDoc = \path content -> putDoc libDir path [content]
       }
+  where
+    testFiles' :: FilePath -> TestFiles
+    testFiles' baseDir =
+      TestFiles
+        { linkChain1 = mkTestFile baseDir "link-chain-1.md",
+          linkChain2 = mkTestFile baseDir "link-chain-2.md",
+          linkChain3 = mkTestFile baseDir "link-chain-3.md",
+          linkChain4 = mkTestFile baseDir "link-chain-4.md",
+          parent = mkTestFile baseDir "parent.md"
+        }
 
 createTempLibraryDir :: IO FilePath
 createTempLibraryDir = do
@@ -190,3 +215,16 @@ step msg expectation = catch expectation catcher
     catcher (HUnitFailure loc (ExpectedButGot preface expected actual)) =
       let newPreface = Just $ maybe msgWithFailed (\p -> msgWithFailed ++ p) preface
        in Exception.throwIO . HUnitFailure loc $ ExpectedButGot newPreface expected actual
+
+getPathFromCurrent :: FilePath -> IO FilePath
+getPathFromCurrent path = do
+  current <- getCurrentDirectory
+  return $ makeRelativeTraversal current path
+
+mkTestFile libDir testFileName =
+  let absPath = libDir </> testFileName
+   in TestFile
+        { pathFromLibrary = testFileName,
+          absolute = absPath,
+          pathFromCurrent = getPathFromCurrent absPath
+        }
