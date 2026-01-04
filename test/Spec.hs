@@ -21,8 +21,8 @@ import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
 import MdGraph.File.Types (AbsolutePath (..), File (..))
 import MdGraph.Node (Link (..))
 import MdGraph.Persist.Class (Queries (getForwardLinks))
-import MdGraph.Persist.Query (forwardLinks, getAllDocuments, getAllEdges, orphansM, unreachableM)
-import MdGraph.Persist.Schema (Document (documentPath), Edge (edgeLabel), EntityField (..))
+import MdGraph.Persist.Query (forwardLinks, getAllDocuments, getAllEdges, getAllTags, orphansM, unreachableM)
+import MdGraph.Persist.Schema (Document (documentPath), Edge (edgeLabel), EntityField (..), Tag (tagName))
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base
 import qualified SubgraphSpec
@@ -188,3 +188,23 @@ parseSpec = do
           let queryResultPaths = edgeLabel . entityVal <$> rawQueryResults
           step "Simple link labels are parsed and stored" $
             queryResultPaths `shouldBe` [linkLabel]
+      fit "Tags are parsed and stored" $
+        \env -> do
+          let docName = "has-tags.md"
+          let metaTagText = "meta-tag"
+          let documentFrontmatter = "---\ntitle: foo bar baz\ntags: " ++ metaTagText ++ "\ndate: 2000-01-01\n---"
+          let inlineTagText = "inline-tag"
+          let documentContent = unlines [documentFrontmatter, "Here is some text and then the tag #" ++ inlineTagText]
+
+          env.createDoc docName $ Text.pack documentContent
+
+          let scanOpt = ScanSome [docName]
+          let args = env.defaultArgs {argCommand = Populate, argScan = scanOpt}
+          mdGraph args
+
+          rawQueryResults <- runSqlite env.dbPath getAllTags
+          let queryResultPaths = tagName . entityVal <$> rawQueryResults
+          step "Meta tags are parsed and stored" $
+            queryResultPaths `shouldContain` [metaTagText]
+          step "Inline tags are parsed and stored" $
+            queryResultPaths `shouldContain` [inlineTagText]

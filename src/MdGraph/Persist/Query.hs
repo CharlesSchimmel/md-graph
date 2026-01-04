@@ -21,6 +21,7 @@ module MdGraph.Persist.Query
     deleteDocuments,
     getAllDocuments,
     getAllEdges,
+    getAllTags,
   )
 where
 
@@ -71,6 +72,11 @@ getAllEdges = select $ do
 getAllDocuments :: Query [Entity Document]
 getAllDocuments = select $ do
   doc <- from $ table @Document
+  return doc
+
+getAllTags :: Query [Entity Tag]
+getAllTags = select $ do
+  doc <- from $ table @Tag
   return doc
 
 insertEdges :: [Edge] -> Query [Key Edge]

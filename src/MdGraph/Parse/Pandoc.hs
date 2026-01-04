@@ -1,4 +1,6 @@
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StrictData #-}
 
 module MdGraph.Parse.Pandoc
   ( sieveLinks,
@@ -7,6 +9,7 @@ module MdGraph.Parse.Pandoc
 where
 
 import Control.Applicative
+import Data.Functor
 import Data.HashSet as S
 import Data.List as L
 import Data.Maybe
@@ -14,6 +17,7 @@ import Data.Maybe
     fromMaybe,
   )
 import Data.Text as T
+import qualified Data.Text as Text
 import Debug.Trace (trace)
 import MdGraph.Node
 import MdGraph.Parse.Types
@@ -75,10 +79,14 @@ instance Monoid PandocResult where
 
 sieveLinks :: Text -> Either PandocError PandocResult
 sieveLinks content = do
-  mdLinks <- extractMarkdownLinks content
-  vwLinks <- extractVimWikiLinks content
-  tags <- extractTags content
-  return $ PandocResult tags (mdLinks <> vwLinks)
+  let markdownReaderOptions = def {readerExtensions = extensionsFromList [Ext_yaml_metadata_block]}
+  acc <- queryMarkdown <$> (runPure . readMarkdown markdownReaderOptions $ content)
+  return $ PandocResult acc.qaTags acc.qaLinks
+
+-- mdLinks <- extractMarkdownLinks content
+-- vwLinks <- extractVimWikiLinks content
+-- tags <- extractTags content
+-- return $ PandocResult tags (mdLinks <> vwLinks)
 
 -- TODO: does pandoc URI %20 escape markdown links?
 -- "title" is the hint text, not useful.
@@ -115,6 +123,45 @@ extractTags content = liftA2 S.union metadataTags inlineHashtags
     markdownReaderOptions =
       def {readerExtensions = extensionsFromList [Ext_yaml_metadata_block]}
 
+data QueryAcc = QueryAcc
+  { qaTags :: HashSet Tag,
+    qaLinks :: HashSet Link
+  }
+  deriving (Show)
+
+instance Semigroup QueryAcc where
+  (<>) qa1 qa2 = QueryAcc (qa1.qaTags <> qa2.qaTags) (qa1.qaLinks <> qa2.qaLinks)
+
+instance Monoid QueryAcc where
+  mempty = QueryAcc S.empty S.empty
+
+queryMarkdown :: Pandoc -> QueryAcc
+queryMarkdown pandoc@(Pandoc meta _) =
+  let maybeMetaValues = lookupMeta "tags" meta
+      maybeMetaTags = query extractMetaTags <$> maybeMetaValues
+      metaTags = fromMaybe mempty maybeMetaTags
+      inlineTagsAndLinks = query extractInline pandoc
+   in metaTags <> inlineTagsAndLinks
+  where
+    extractMetaTags :: MetaValue -> QueryAcc
+    extractMetaTags (MetaInlines lines) =
+      let cleanLine = T.takeWhile isValidTagChar . stringify
+          cleanedLines = P.filter (not . Text.null) $ cleanLine <$> lines
+          tagSet = S.fromList $ Tag <$> cleanedLines
+       in mempty {qaTags = tagSet}
+    extractTagsFromMeta _ = mempty
+
+extractInline :: Inline -> QueryAcc
+extractInline link@(Pandoc.Link {}) = mempty {qaLinks = extractUrl link}
+extractInline image@(Pandoc.Image {}) = mempty {qaLinks = extractUrl image}
+extractInline (Str str)
+  | "#" `Text.isPrefixOf` str = mempty {qaTags = S.singleton . Tag . Text.tail $ str}
+  | otherwise = mempty
+extractInline _ = mempty
+
+queryVimWiki :: Pandoc -> QueryAcc
+queryVimWiki pandoc@(Pandoc {}) = query extractInline pandoc
+
 -- Pandoc splits Str on whitespace; they are whitespace-less
 extractHashTag :: Inline -> HashSet Tag
 extractHashTag (Str tag) = case T.uncons tag of
@@ -144,7 +191,5 @@ extractMetadataTags (Pandoc meta _) =
     actualExtract :: MetaValue -> [Tag]
     actualExtract (MetaList values) = values >>= actualExtract
     actualExtract (MetaInlines lines) =
-      parseMetadataTag <$> catMaybes (unInlines <$> lines)
+      parseMetadataTag . stringify <$> lines
     actualExtract _ = []
-    unInlines (Str text) = Just text
-    unInlines _ = Nothing
