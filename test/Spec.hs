@@ -21,8 +21,8 @@ import MdGraph.File (Files (..), isAncestorOf, normaliseEvil, unrelativize)
 import MdGraph.File.Types (AbsolutePath (..), File (..))
 import MdGraph.Node (Link (..))
 import MdGraph.Persist.Class (Queries (getForwardLinks))
-import MdGraph.Persist.Query (forwardLinks, getAllDocuments, orphansM, unreachableM)
-import MdGraph.Persist.Schema (Document (documentPath), EntityField (..))
+import MdGraph.Persist.Query (forwardLinks, getAllDocuments, getAllEdges, orphansM, unreachableM)
+import MdGraph.Persist.Schema (Document (documentPath), Edge (edgeLabel), EntityField (..))
 import qualified MdGraph.TagDirection as TagDirection
 import Spec.Base
 import qualified SubgraphSpec
@@ -36,6 +36,7 @@ main = do
     FilesSpec.spec
     SubgraphSpec.spec
     populateSpec
+    parseSpec
 
     setupSpecEnv $
       describe "Path handling" $ do
@@ -168,3 +169,22 @@ populateSpec = do
           let command = Subgraph $ baseSgOptions {sgTargets = [FileTarget env.testFiles.linkChain1.absolute]}
           let args = env.defaultArgs {argCommand = command, argScan = ScanNone}
           mdGraph args >>= outputContains [takeFileName env.testFiles.linkChain2.absolute]
+
+parseSpec :: Spec
+parseSpec = do
+  setupSpecEnv $
+    describe "Parse" $ do
+      it "Link labels are parsed and stored" $
+        \env -> do
+          let docName = "has-link-text.md"
+          let linkLabel = "this is the link label"
+          env.createDoc docName $ Text.pack $ "[" ++ linkLabel ++ "](./link target is not relevant.md)"
+
+          let scanOpt = ScanSome [docName]
+          let args = env.defaultArgs {argCommand = Populate, argScan = scanOpt}
+          mdGraph args
+
+          rawQueryResults <- runSqlite env.dbPath getAllEdges
+          let queryResultPaths = edgeLabel . entityVal <$> rawQueryResults
+          step "Simple link labels are parsed and stored" $
+            queryResultPaths `shouldBe` [linkLabel]

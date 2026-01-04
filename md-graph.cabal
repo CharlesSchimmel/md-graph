@@ -44,6 +44,7 @@ library
       MdGraph.Node
       MdGraph.Parse
       MdGraph.Parse.Pandoc
+      MdGraph.Parse.Types
       MdGraph.Persist
       MdGraph.Persist.Class
       MdGraph.Persist.Graph
@@ -109,6 +110,7 @@ executable md-graph
       MdGraph.Node
       MdGraph.Parse
       MdGraph.Parse.Pandoc
+      MdGraph.Parse.Types
       MdGraph.Persist
       MdGraph.Persist.Class
       MdGraph.Persist.Graph

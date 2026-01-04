@@ -20,6 +20,7 @@ module MdGraph.Persist.Query
     backwardLinks,
     deleteDocuments,
     getAllDocuments,
+    getAllEdges,
   )
 where
 
@@ -61,6 +62,11 @@ import MdGraph.App
 import MdGraph.Config (Config (dbConnString))
 import MdGraph.Persist.Schema
 import UnliftIO.Resource (ResourceT (..))
+
+getAllEdges :: Query [Entity Edge]
+getAllEdges = select $ do
+  doc <- from $ table @Edge
+  return doc
 
 getAllDocuments :: Query [Entity Document]
 getAllDocuments = select $ do

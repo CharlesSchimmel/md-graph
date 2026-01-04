@@ -35,8 +35,15 @@ data Arguments = Arguments
     argDatabase :: DatabaseArg,
     argLogLevel :: LogLevel,
     argScan :: ScanOptions,
+    -- argFormat :: FormatType,
     argCommand :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
   }
+  deriving (Show)
+
+data ScanOptions = ScanAll | ScanSome [FilePath] | ScanNone
+  deriving (Show)
+
+data FormatType = Markdown | Wiki | Infer
   deriving (Show)
 
 cliArguments :: IO Arguments
@@ -55,6 +62,7 @@ parseArguments =
     <*> parseDatabase
     <*> parseLogLevel
     <*> parseScanOptions
+    -- <*> parseDocumentFormat
     <*> parseCommand -- Again, see note above. This should stay last.
 
 parseCommand :: Parser Command
@@ -89,8 +97,7 @@ parseCommand =
           (info (pure Populate) $ progDesc "Don't perform any graph operations, just scan files and update them in the database.")
     )
 
-data ScanOptions = ScanAll | ScanSome [FilePath] | ScanNone
-  deriving (Show)
+-- parseDocumentFormat :: Parser DocumentFormat
 
 parseScanOptions :: Parser ScanOptions
 parseScanOptions =
