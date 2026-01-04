@@ -1,13 +1,17 @@
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module MdGraph.Populate (populate) where
 
 import Aux.Common (for)
 import Aux.Map as Map
 import Control.Applicative (Alternative (..), Applicative (..), (<$>))
+import Control.Monad
 import qualified Control.Monad as Monad
 import qualified Data.Either as Either
 import qualified Data.Foldable as Foldable
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
+import Data.List (group)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
@@ -175,14 +179,17 @@ parseDocumentsAndOrganizeResults filesAndDocumentToParse = do
     relativeLink <- mkLinksRelativeToLibrary linkWithExtension
     return (doc, relativeLink)
 
-  let newEdges = uncurry Mapper.toEdge <$> documentAndRelativeLinksWithExtensions
+  let allEdges = uncurry Mapper.toEdge <$> documentAndRelativeLinksWithExtensions
+  let groupedEdges = Map.groupBy (\i -> (i.edgeHead, i.edgeTail)) allEdges
+  -- TODO: There's a database constraint for unique edges that we probably don't need.
+  let dedupedEdges = head <$> Map.elems groupedEdges
 
   let newTags =
         postParseCtxs
           >>= ( \PostParseCtx {ppcTag, ppcDocument} ->
                   Mapper.toTag ppcDocument <$> ppcTag
               )
-  return $ (newEdges, newTags)
+  return $ (dedupedEdges, newTags)
 
 unrollUnrelativizeLinks :: PostParseCtx -> [(Key Document, AbsoluteLink)]
 unrollUnrelativizeLinks PostParseCtx {ppcFile, ppcDocument, ppcLinks} = do

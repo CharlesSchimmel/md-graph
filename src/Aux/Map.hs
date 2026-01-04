@@ -34,3 +34,10 @@ unionZip mapA mapB =
 -- | Build a map from a list of values using a function to select the key
 fromList' :: (Eq k, Ord k) => (v -> k) -> [v] -> Map k v
 fromList' keySelector = fromList . mapToFst keySelector
+
+groupBy :: forall k v. (Eq k, Ord k) => (v -> k) -> [v] -> Map k [v]
+groupBy keySelector items =
+  let withKeys = fmap (\item -> (keySelector item, items)) items
+      folder :: Map k [v] -> v -> Map k [v]
+      folder map item = insertWith (++) (keySelector item) [item] map
+   in Prelude.foldl folder mempty items
