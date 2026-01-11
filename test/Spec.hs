@@ -188,7 +188,7 @@ parseSpec = do
           let queryResultPaths = edgeLabel . entityVal <$> rawQueryResults
           step "Simple link labels are parsed and stored" $
             queryResultPaths `shouldBe` [linkLabel]
-      fit "Tags are parsed and stored" $
+      it "Tags are parsed and stored" $
         \env -> do
           let docName = "has-tags.md"
           let metaTagText = "meta-tag"

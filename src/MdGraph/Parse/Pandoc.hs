@@ -26,7 +26,7 @@ import qualified Network.URI as URI
   ( unEscapeString,
   )
 import System.FilePath (normalise)
-import Text.Pandoc (PandocMonad)
+import Text.Pandoc (PandocMonad, readOrg)
 import Text.Pandoc.Builder
   ( MetaValue
       ( MetaInlines,
@@ -65,6 +65,7 @@ type PandocReader = forall m a. (PandocMonad m, ToSources a) => ReaderOptions ->
 getFormatReader :: DocumentFormat -> PandocReader
 getFormatReader Markdown = readMarkdown
 getFormatReader MediaWiki = readMediaWiki
+getFormatReader OrgMode = readOrg
 
 singleTag tag = PandocResult {tags = S.singleton tag, links = S.empty}
 
@@ -103,25 +104,8 @@ extractUrl _ = S.empty
 ignoreAnchors :: Text -> Text
 ignoreAnchors = T.takeWhile (/= '#')
 
-extractLinks :: PandocReader -> Text -> Either PandocError (HashSet Link)
-extractLinks reader text = query extractUrl <$> (runPure . reader def $ text)
-
-extractMarkdownLinks :: Text -> Either PandocError (HashSet Link)
-extractMarkdownLinks t = query extractUrl <$> (runPure . readMarkdown def $ t)
-
-extractVimWikiLinks :: Text -> Either PandocError (HashSet Link)
-extractVimWikiLinks t = query extractUrl <$> (runPure . readVimwiki def $ t)
-
-extractTags content = liftA2 S.union metadataTags inlineHashtags
-  where
-    inlineHashtags =
-      query extractHashTag <$> (runPure . readVimwiki def $ content)
-    metadataTags =
-      extractMetadataTags
-        <$> (runPure . readMarkdown markdownReaderOptions $ content)
-    markdownReaderOptions :: ReaderOptions
-    markdownReaderOptions =
-      def {readerExtensions = extensionsFromList [Ext_yaml_metadata_block]}
+-- extractLinks :: PandocReader -> Text -> Either PandocError (HashSet Link)
+-- extractLinks reader text = query extractUrl <$> (runPure . reader def $ text)
 
 data QueryAcc = QueryAcc
   { qaTags :: HashSet Tag,
@@ -161,6 +145,9 @@ extractInline _ = mempty
 
 queryVimWiki :: Pandoc -> QueryAcc
 queryVimWiki pandoc@(Pandoc {}) = query extractInline pandoc
+
+queryOrgMode :: Pandoc -> QueryAcc
+queryOrgMode pandoc@(Pandoc {}) = query extractInline pandoc
 
 -- Pandoc splits Str on whitespace; they are whitespace-less
 extractHashTag :: Inline -> HashSet Tag
