@@ -41,6 +41,7 @@ import qualified Test.HUnit
 import Test.HUnit.Lang
 import Test.Hspec
 import Text.Printf
+import MdGraph.Parse.Types
 
 data SpecEnv = SpecEnv
   { libraryDir :: FilePath,
@@ -173,7 +174,8 @@ defaultSpecArgs =
       argDatabase = DbFile ":memory:",
       argLogLevel = LogLevel.None,
       argCommand = Command.Populate,
-      argScan = ScanAll
+      argScan = ScanAll,
+      argDocFormat = [Markdown]
     }
 
 baseSgOptions :: SubgraphOptions

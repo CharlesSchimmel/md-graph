@@ -1,33 +1,36 @@
-{-# LANGUAGE EmptyDataDecls             #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module MdGraph.Persist.Schema where
 
-import           Control.Monad.IO.Class         ( MonadIO
-                                                , liftIO
-                                                )
-import           Control.Monad.Logger           ( NoLoggingT )
-import           Control.Monad.Reader           ( ReaderT )
-import           Control.Monad.Trans.Resource   ( ResourceT )
-import           Data.Text                      ( Text )
-import           Data.Time.Clock
-import           Database.Persist
-import           Database.Persist.Quasi
-import           Database.Persist.Sqlite
-import           Database.Persist.TH
+import Control.Monad.IO.Class
+  ( MonadIO,
+    liftIO,
+  )
+import Control.Monad.Logger (NoLoggingT)
+import Control.Monad.Reader (ReaderT)
+import Control.Monad.Trans.Resource (ResourceT)
+import Data.Hashable (Hashable)
+import Data.Text (Text)
+import Data.Time.Clock
+import Database.Persist
+import Database.Persist.Quasi
+import Database.Persist.Sqlite
+import Database.Persist.TH
 
 {- File:
 
@@ -38,7 +41,9 @@ import           Database.Persist.TH
    "proper" graph terms: "tail" is the source file, "head" is what it's
    referencing
 -}
-share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
+share
+  [mkPersist sqlSettings, mkMigrate "migrateAll"]
+  [persistLowerCase|
 Document
     path String
     Primary path
@@ -75,4 +80,3 @@ type Query a = ReaderT SqlBackend (NoLoggingT (ResourceT IO)) a
 
 migrateMdGraph :: Query [Text]
 migrateMdGraph = runMigrationQuiet migrateAll
-

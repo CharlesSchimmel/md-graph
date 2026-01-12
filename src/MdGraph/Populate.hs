@@ -3,12 +3,14 @@
 module MdGraph.Populate (populate) where
 
 import Aux.Common (for)
+import qualified Aux.HashMap as HashMap
 import Aux.Map as Map
 import Control.Applicative (Alternative (..), Applicative (..), (<$>))
 import Control.Monad
 import qualified Control.Monad as Monad
 import qualified Data.Either as Either
 import qualified Data.Foldable as Foldable
+import Data.HashMap.Strict as HashMap
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.List (group)
@@ -32,7 +34,8 @@ import qualified MdGraph.Persist.Mapper as Mapper
 import MdGraph.Persist.Schema
 import qualified MdGraph.Persist.Schema as Schema
 import System.FilePath
-  ( (-<.>),
+  ( dropExtension,
+    (-<.>),
     (<.>),
     (</>),
   )
@@ -173,9 +176,11 @@ parseDocumentsAndOrganizeResults filesAndDocumentToParse = do
     logError "Failed to parse some files" -- TODO add more detail
   let documentsAndAbsoluteLinks = postParseCtxs >>= unrollUnrelativizeLinks
 
-  let knownFilePaths = HashSet.fromList $ fmap (\(FoundDocument {fdAbsolutePath}, _) -> unAbsolutePath fdAbsolutePath) filesAndDocumentToParse
+  let knownFilePaths = fmap (\(doc, _) -> doc.fdAbsolutePath.unAbsolutePath) filesAndDocumentToParse
+  let extensionlessToFullPath = HashMap.fromList' dropExtension knownFilePaths
+  let knownFilePathsSet = HashSet.fromList knownFilePaths
   documentAndRelativeLinksWithExtensions <- Monad.forM documentsAndAbsoluteLinks $ \(doc, link) -> do
-    linkWithExtension <- addExtensionIfFileExists knownFilePaths link
+    linkWithExtension <- addExtensionIfFileExists knownFilePathsSet extensionlessToFullPath link
     relativeLink <- mkLinksRelativeToLibrary linkWithExtension
     return (doc, relativeLink)
 
@@ -206,15 +211,18 @@ unrelativizeLink path link@(Link {linkPath}) = AbsoluteLink $ link {linkPath = u
 -- | Links don't necessarily have or need a file extension. Check if a link's
 -- path exists when we append the default extension. If it does, use that
 -- instead.
+-- TODO: or check all known paths without extension. Trim the extension off of all the paths we've found and compare them
 addExtensionIfFileExists ::
   (Monad m, Files m, HasConfig m) =>
   HashSet FilePath ->
+  HashMap FilePath FilePath ->
   AbsoluteLink ->
   m AbsoluteLink
-addExtensionIfFileExists knownFiles (AbsoluteLink link@(Link {linkPath})) = do
+addExtensionIfFileExists knownFiles knownFilesWithoutExtension (AbsoluteLink link@(Link {linkPath})) = do
   Config {defaultExtension} <- getConfig
 
   pathExistsUnmodified <- checkPathExists knownFiles linkPath
+  -- pathExistsWithoutExtension <- checkPathExists knownFilesWithoutExtension (dropExtension linkPath)
 
   let pathWithExtension = linkPath -<.> defaultExtension
   pathExistsWithExtension <- checkPathExists knownFiles pathWithExtension

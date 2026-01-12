@@ -20,6 +20,7 @@ import Data.Text as T
 import MdGraph.App.Command
 import MdGraph.App.LogLevel as LogLevel
 import MdGraph.Node
+import MdGraph.Parse.Types
 import MdGraph.TagDirection as TagDirection
 import Options.Applicative
 import System.Directory as D
@@ -36,6 +37,7 @@ data Arguments = Arguments
     argLogLevel :: LogLevel,
     argScan :: ScanOptions,
     -- argFormat :: FormatType,
+    argDocFormat :: [DocumentFormat],
     argCommand :: Command -- OptParse determines arguments order from the order in which parsers are applied, so this should stay last
   }
   deriving (Show)
@@ -43,8 +45,8 @@ data Arguments = Arguments
 data ScanOptions = ScanAll | ScanSome [FilePath] | ScanNone
   deriving (Show)
 
-data FormatType = Markdown | Wiki | Infer
-  deriving (Show)
+-- data FormatType = Markdown | Wiki
+--   deriving (Show)
 
 cliArguments :: IO Arguments
 cliArguments =
@@ -62,7 +64,7 @@ parseArguments =
     <*> parseDatabase
     <*> parseLogLevel
     <*> parseScanOptions
-    -- <*> parseDocumentFormat
+    <*> parseDocumentFormat
     <*> parseCommand -- Again, see note above. This should stay last.
 
 parseCommand :: Parser Command
@@ -113,7 +115,7 @@ parseScanOptions =
             ( strOption
                 ( long "scan-file"
                     <> help "Scan and update only the given files or directories."
-                    <> short 'f'
+                    <> short 's'
                     <> metavar "FILE|DIR"
                 )
             )
@@ -260,4 +262,26 @@ parseLogLevel =
       "info" -> Just LogLevel.Info
       "error" -> Just LogLevel.Error
       "none" -> Just LogLevel.None
+      _ -> Nothing
+
+parseDocumentFormat :: Parser [DocumentFormat]
+parseDocumentFormat =
+  some $
+    option readDocumentFormat $
+      long "format"
+        <> help "Specify the document formats that md-graph should parse with"
+        <> short 'f'
+        <> metavar "Markdown|md|Mediawiki|wiki"
+        <> value Markdown
+        <> showDefault
+  where
+    readDocumentFormat :: ReadM DocumentFormat
+    readDocumentFormat = maybeReader . asLower $ \case
+      "md" -> Just Markdown
+      "markdown" -> Just Markdown
+      "obsidian" -> Just Markdown
+      "wiki" -> Just MediaWiki
+      "mediawiki" -> Just MediaWiki
+      "zimwiki" -> Just MediaWiki
+      "vimwiki" -> Just MediaWiki
       _ -> Nothing

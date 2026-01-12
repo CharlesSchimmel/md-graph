@@ -3,14 +3,15 @@ module MdGraph.Parse.Types where
 import Data.Char (toLower)
 import System.FilePath (takeExtension)
 
-data DocumentFormat = Markdown | MediaWiki | OrgMode
-  deriving (Show)
+data DocumentFormat = Markdown | MediaWiki
+  deriving (-- | OrgMode
+            Show)
 
 inferDocumentFormat :: FilePath -> Maybe DocumentFormat
 inferDocumentFormat path =
   case ext of
     "md" -> Just Markdown
-    "org" -> Just OrgMode
+    -- "org" -> Just OrgMode
     "wiki" -> Just MediaWiki
     _ -> Nothing
   where

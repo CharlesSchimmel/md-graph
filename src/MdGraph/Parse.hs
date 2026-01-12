@@ -38,6 +38,7 @@ import MdGraph.File.Types
   )
 import MdGraph.Node
 import MdGraph.Parse.Pandoc
+import MdGraph.Parse.Types
 import MdGraph.Util
   ( mapLeft,
     trace',
@@ -72,7 +73,7 @@ parseDocumentIO absolutePath@(AbsolutePath filePath) = do
     else do
       fileContent <- T.readFile filePath
       return . mapLeft PandocFail $ do
-        PandocResult {tags, links} <- sieveLinks fileContent
+        PandocResult {tags, links} <- sieveLinks [Markdown] fileContent
         return $
           ParseResult
             absolutePath

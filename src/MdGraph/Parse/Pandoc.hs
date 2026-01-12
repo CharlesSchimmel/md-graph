@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StrictData #-}
@@ -65,7 +66,8 @@ type PandocReader = forall m a. (PandocMonad m, ToSources a) => ReaderOptions ->
 getFormatReader :: DocumentFormat -> PandocReader
 getFormatReader Markdown = readMarkdown
 getFormatReader MediaWiki = readMediaWiki
-getFormatReader OrgMode = readOrg
+
+-- getFormatReader OrgMode = readOrg
 
 singleTag tag = PandocResult {tags = S.singleton tag, links = S.empty}
 
@@ -78,11 +80,15 @@ instance Semigroup PandocResult where
 instance Monoid PandocResult where
   mempty = PandocResult mempty mempty
 
-sieveLinks :: Text -> Either PandocError PandocResult
-sieveLinks content = do
-  let markdownReaderOptions = def {readerExtensions = extensionsFromList [Ext_yaml_metadata_block]}
-  acc <- queryMarkdown <$> (runPure . readMarkdown markdownReaderOptions $ content)
+sieveLinks :: [DocumentFormat] -> Text -> Either PandocError PandocResult
+sieveLinks docFormats content = do
+  accs <- mapM runDocFormat docFormats
+  let acc = mconcat accs
   return $ PandocResult acc.qaTags acc.qaLinks
+  where
+    markdownReaderOptions = def {readerExtensions = extensionsFromList [Ext_yaml_metadata_block]}
+    runDocFormat Markdown = queryMarkdown <$> (runPure . readMarkdown markdownReaderOptions $ content)
+    runDocFormat MediaWiki = queryVimWiki <$> (runPure . readMediaWiki def $ content)
 
 -- mdLinks <- extractMarkdownLinks content
 -- vwLinks <- extractVimWikiLinks content
@@ -121,8 +127,8 @@ instance Monoid QueryAcc where
 
 queryMarkdown :: Pandoc -> QueryAcc
 queryMarkdown pandoc@(Pandoc meta _) =
-  let maybeMetaValues = lookupMeta "tags" meta
-      maybeMetaTags = query extractMetaTags <$> maybeMetaValues
+  let maybeMetaTagValues = lookupMeta "tags" meta
+      maybeMetaTags = query extractMetaTags <$> maybeMetaTagValues
       metaTags = fromMaybe mempty maybeMetaTags
       inlineTagsAndLinks = query extractInline pandoc
    in metaTags <> inlineTagsAndLinks
@@ -146,8 +152,9 @@ extractInline _ = mempty
 queryVimWiki :: Pandoc -> QueryAcc
 queryVimWiki pandoc@(Pandoc {}) = query extractInline pandoc
 
-queryOrgMode :: Pandoc -> QueryAcc
-queryOrgMode pandoc@(Pandoc {}) = query extractInline pandoc
+-- queryOrgMode :: Pandoc -> QueryAcc
+-- queryOrgMode pandoc@(Pandoc {}) = query extractInline pandoc
+-- Org Mode tags are more complicated...https://orgmode.org/manual/Tags.html
 
 -- Pandoc splits Str on whitespace; they are whitespace-less
 extractHashTag :: Inline -> HashSet Tag

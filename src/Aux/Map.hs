@@ -39,5 +39,6 @@ groupBy :: forall k v. (Eq k, Ord k) => (v -> k) -> [v] -> Map k [v]
 groupBy keySelector items =
   let withKeys = fmap (\item -> (keySelector item, items)) items
       folder :: Map k [v] -> v -> Map k [v]
+      -- TODO: I'm pretty sure list concatenation is terrible, find a better DS
       folder map item = insertWith (++) (keySelector item) [item] map
    in Prelude.foldl folder mempty items
