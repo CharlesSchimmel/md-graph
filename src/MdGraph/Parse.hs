@@ -19,6 +19,7 @@ import Data.Maybe
   ( catMaybes,
     fromMaybe,
   )
+import qualified Data.Set as Set
 import Data.Text as T
 import Data.Text.IO as T
   ( readFile,
@@ -72,8 +73,12 @@ parseDocumentIO absolutePath@(AbsolutePath filePath) = do
     then return . Left $ FileNotFound
     else do
       fileContent <- T.readFile filePath
+      let inferredDocumentFormat = maybe [] pure $ inferDocumentFormat filePath
+      -- let parseFormats = Set.toList $ Set.fromList (Markdown : inferredDocumentFormat)
+      -- I'm shelving this work for now.
+      let parseFormats = [Markdown]
       return . mapLeft PandocFail $ do
-        PandocResult {tags, links} <- sieveLinks [Markdown] fileContent
+        PandocResult {tags, links} <- sieveLinks parseFormats fileContent
         return $
           ParseResult
             absolutePath

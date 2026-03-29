@@ -29,6 +29,7 @@ import MdGraph.File
 import MdGraph.File.Types
 import MdGraph.Node as Node
 import MdGraph.Parse
+import MdGraph.Parse.Types (inferDocumentFormat)
 import MdGraph.Persist.Class (PreparesDb (..))
 import qualified MdGraph.Persist.Mapper as Mapper
 import MdGraph.Persist.Schema
@@ -158,6 +159,7 @@ parseDocumentsAndOrganizeResults ::
   m ([Edge], [Schema.Tag])
 parseDocumentsAndOrganizeResults filesAndDocumentToParse = do
   parseErrorOrContext <- Monad.forM filesAndDocumentToParse $ \(file, document) -> do
+    let inferredDocumentType = inferDocumentFormat file.fdAbsolutePath.unAbsolutePath
     parseErrorOrResult <- parseDocument . fdAbsolutePath $ file
     return $ do
       -- Either Monad
@@ -176,11 +178,9 @@ parseDocumentsAndOrganizeResults filesAndDocumentToParse = do
     logError "Failed to parse some files" -- TODO add more detail
   let documentsAndAbsoluteLinks = postParseCtxs >>= unrollUnrelativizeLinks
 
-  let knownFilePaths = fmap (\(doc, _) -> doc.fdAbsolutePath.unAbsolutePath) filesAndDocumentToParse
-  let extensionlessToFullPath = HashMap.fromList' dropExtension knownFilePaths
-  let knownFilePathsSet = HashSet.fromList knownFilePaths
+  let knownFiles = HashSet.fromList $ fmap (\(doc, _) -> doc.fdAbsolutePath.unAbsolutePath) filesAndDocumentToParse
   documentAndRelativeLinksWithExtensions <- Monad.forM documentsAndAbsoluteLinks $ \(doc, link) -> do
-    linkWithExtension <- addExtensionIfFileExists knownFilePathsSet extensionlessToFullPath link
+    linkWithExtension <- addExtensionIfFileExists knownFiles link
     relativeLink <- mkLinksRelativeToLibrary linkWithExtension
     return (doc, relativeLink)
 
@@ -215,10 +215,9 @@ unrelativizeLink path link@(Link {linkPath}) = AbsoluteLink $ link {linkPath = u
 addExtensionIfFileExists ::
   (Monad m, Files m, HasConfig m) =>
   HashSet FilePath ->
-  HashMap FilePath FilePath ->
   AbsoluteLink ->
   m AbsoluteLink
-addExtensionIfFileExists knownFiles knownFilesWithoutExtension (AbsoluteLink link@(Link {linkPath})) = do
+addExtensionIfFileExists knownFiles (AbsoluteLink link@(Link {linkPath})) = do
   Config {defaultExtension} <- getConfig
 
   pathExistsUnmodified <- checkPathExists knownFiles linkPath

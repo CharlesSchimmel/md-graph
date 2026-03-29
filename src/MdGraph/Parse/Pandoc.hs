@@ -67,8 +67,6 @@ getFormatReader :: DocumentFormat -> PandocReader
 getFormatReader Markdown = readMarkdown
 getFormatReader MediaWiki = readMediaWiki
 
--- getFormatReader OrgMode = readOrg
-
 singleTag tag = PandocResult {tags = S.singleton tag, links = S.empty}
 
 singleLink link = PandocResult {tags = S.empty, links = S.singleton link}

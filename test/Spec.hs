@@ -208,3 +208,19 @@ parseSpec = do
             queryResultPaths `shouldContain` [metaTagText]
           step "Inline tags are parsed and stored" $
             queryResultPaths `shouldContain` [inlineTagText]
+
+-- I'm shelving this work for now.
+-- fit "Document format is inferred and wiki links are read in a markdown library" $
+--   \env -> do
+--     let docName = "is-wiki.wiki"
+--     env.createDoc docName "[[parent.md]]"
+
+--     let scanOpt = ScanSome [docName]
+--     let args = env.defaultArgs {argCommand = Populate, argScan = scanOpt, argLogLevel = LogLevel.Debug}
+--     mdGraph args
+
+--     rawQueryResults <- runSqlite env.dbPath getAllEdges
+--     let queryResultPaths = edgeLabel . entityVal <$> rawQueryResults
+--     step "Simple link labels are parsed and stored" $
+--       queryResultPaths `shouldBe` [env.testFiles.parent.pathFromLibrary]
+--
